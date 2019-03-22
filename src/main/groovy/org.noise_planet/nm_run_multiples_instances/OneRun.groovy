@@ -76,8 +76,6 @@ import java.nio.file.Path
 import java.nio.file.Paths
 
 
-
-
 class OneRun {
     static void main(String[] args) {
         OneRun oneRun = new OneRun()
@@ -99,6 +97,7 @@ class OneRun {
 
         boolean clean = true // reset the postgis database
         boolean printply = true // sort un ply de la zone
+        boolean printresult = true // sort un ply de la zone
         boolean saveRays = true
         boolean loadRays = false
         int batrec = 2
@@ -140,10 +139,10 @@ class OneRun {
         String rootPath = scriptLocation.getParent().getParent().getParent().getParent().toString()
 
         // Paramètres de propagation
-        int reflexion_order = 1
-        int diffraction_order = 10
-        double max_src_dist = 500
-        double max_ref_dist = 500
+        int reflexion_order = 0
+        int diffraction_order = 0
+        double max_src_dist = 200
+        double max_ref_dist = 200
         double min_ref_dist = 1.0
         double wall_alpha = 0.1 // todo pour le moment cette valeur ne peut pas être changé
         double forget_source = 0.1 // todo pour le moment cette valeur est inutile
@@ -281,7 +280,7 @@ class OneRun {
                 String filename2 = workspace_output + "\\" + zone_name + ".ply"
                 String filename3 = workspace_output + "\\" + zone_name + ".kml"
                 try {
-                   // writePLY(filename2, mesh)
+                    // writePLY(filename2, mesh)
                     writeKML(filename3, mesh, manager)
                 } catch (IOException e) {
                     e.printStackTrace()
@@ -442,7 +441,7 @@ class OneRun {
 
             fetchCellSource_withindex(connection, null, sourceGeometries, sources_table_name, sourcesPk, wj_sources, sourcesIndex)
 
-            if (!loadRays){
+            if (!loadRays) {
                 System.out.println("Compute Rays...")
                 // Configure noisemap with specified receivers
                 //-----------------------------------------------------------------
@@ -482,12 +481,11 @@ class OneRun {
                             e.printStackTrace()
                         }
                     }
-                   /* if (propaMap.size()>10){
-                        break
-                    }*/
+                    /* if (propaMap.size()>10){
+                         break
+                     }*/
                 }
             }
-
 
             // Ici on rentre dans la phase calcul de la matrice de transfer
             ComputeRaysOut output = new ComputeRaysOut()
@@ -501,26 +499,27 @@ class OneRun {
             serializer.setKeysCanBeNull(false)
             serializer.setKeyClass(String.class, kryo.getSerializer(String.class))
 
-           String filenamebin = workspace_output + "\\Rays.bin"
-          /*  if (saveRays && !loadRays){
-                Output outputBin = new Output(new FileOutputStream(filenamebin))
-                kryo.writeObject(outputBin, propaMap)
-                outputBin.close()
-            }
+            String filenamebin = workspace_output + "\\Rays.bin"
+            /*  if (saveRays && !loadRays){
+                  Output outputBin = new Output(new FileOutputStream(filenamebin))
+                  kryo.writeObject(outputBin, propaMap)
+                  outputBin.close()
+              }
 
-            if (loadRays){
-                Input input = new Input(new FileInputStream(filenamebin))
-                propaMap = kryo.readObject(input, HashMap.class)
-                input.close()
-            }
-*/
-
+              if (loadRays){
+                  Input input = new Input(new FileInputStream(filenamebin))
+                  propaMap = kryo.readObject(input, HashMap.class)
+                  input.close()
+              }
+  */
+            HashMap<Integer, Double> Result_by_receivers = new HashMap<>()
             Iterator it = propaMap.entrySet().iterator()
             while (it.hasNext()) {
                 Map.Entry pair = (Map.Entry) it.next()
                 int idReceiver = pair.getKey()
 
                 HashMap<Integer, double[]> aGlobal = new HashMap<>()
+
 
                 PropagationProcessPathData propData = new PropagationProcessPathData()
                 propData.setTemperature(10)
@@ -545,17 +544,34 @@ class OneRun {
                         double[] att = (double[]) pair2.getValue()
                         int idRecv = receiversPk.get(idReceiver).toInteger()
                         int idSrc = sourcesPk.get((Integer) pair2.getKey()).toInteger()
-                        output.addVerticeSoundLevel(idRecv, (Integer) pair2.getKey(), (double[]) pair2.getValue())
+                        double[] sourceLevel = wj_sources.get((Integer) pair2.getKey())
+                        output.addVerticeSoundLevel(idRecv, (Integer) pair2.getKey(), sourceLevel)
                         ps.addBatch(idRecv, idSrc,
                                 att[0], att[1], att[2], att[3], att[4], att[5], att[6], att[7])
 
-
+                        if (Result_by_receivers.containsKey(idReceiver)) {
+                            Result_by_receivers.replace(idReceiver, wToDba( sourceLevel[0]+ DbaToW(Result_by_receivers.get(idReceiver)) + DbaToW(att[0])))
+                        } else {
+                            Result_by_receivers.put(idReceiver, wToDba( sourceLevel[0]+  DbaToW(att[0])))
+                        }
 
                         it2.remove() // avoids a ConcurrentModificationException
                     }
                 }
 
                 it.remove()
+            }
+
+
+            if (printresult) {
+                System.out.println("Impression resultats...")
+                String filename3 = workspace_output + "\\Result.kml"
+                try {
+                    // writePLY(filename2, mesh)
+                    writeKML_Result(filename3, manager, receivers, Result_by_receivers)
+                } catch (IOException e) {
+                    e.printStackTrace()
+                }
             }
 
             // A partir de la jusqua la fin c'est de la jointure de table,
@@ -661,7 +677,7 @@ class OneRun {
             evaluateAttenuationCnossos.evaluate(propath, propData)
             aGlobalPathFav = evaluateAttenuationCnossos.getaGlobal()
             // todo bug meteo
-            propath.setFavorable(false)
+            propath.setFavorable(true)
             evaluateAttenuationCnossos.evaluate(propath, propData)
             aGlobalPathHom = evaluateAttenuationCnossos.getaGlobal()
 
@@ -740,7 +756,6 @@ class OneRun {
 
     }
 
-
     /**
      * Permet de tracer les rayons dans un vtk lisible dans paraview
      * @param filename
@@ -792,7 +807,7 @@ class OneRun {
                 Coordinate coordinate = outPutGeom.getCoordinate()
 
 
-                fileWriter.write("\t\t\t"+coordinate.x.toString()+","+ coordinate.y.toString()+","+ (p.coordinate.z - z).toString() +"\n")
+                fileWriter.write("\t\t\t" + coordinate.x.toString() + "," + coordinate.y.toString() + "," + (p.coordinate.z - z).toString() + "\n")
 
             }
             fileWriter.write('\t\t\t</coordinates>\n')
@@ -803,9 +818,368 @@ class OneRun {
         fileWriter.write('</kml>')
         fileWriter.close()
     }
+/**
+ * Permet de tracer les rayons dans un vtk lisible dans paraview
+ * @param filename
+ * @param propDataOut
+ * @throws IOException
+ */
+    private void writeKML_Result(String filename, FastObstructionTest mesh, List<Coordinate> receivers, HashMap<Integer, Double> Result_by_receivers) throws IOException {
+
+        FileWriter fileWriter = new FileWriter(filename)
+        fileWriter.write('<?xml version="1.0" encoding="UTF-8"?>\n')
+        fileWriter.write('<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2" xmlns:kml="http://www.opengis.net/kml/2.2" xmlns:atom="http://www.w3.org/2005/Atom">\n')
+        fileWriter.write('<Document>\n')
+        fileWriter.write('<name>Results</name>\n')
 
 
+        fileWriter.write('<StyleMap id="msn_shaded_dot1">\n')
+        fileWriter.write('	<Pair>\n')
+        fileWriter.write('	<key>normal</key>\n')
+        fileWriter.write('  <styleUrl>#sn_shaded_dot1</styleUrl>\n')
+        fileWriter.write('	</Pair>\n')
+        fileWriter.write('   <Pair>\n')
+        fileWriter.write('   <key>highlight</key>\n')
+        fileWriter.write('		<styleUrl>#sh_shaded_dot1</styleUrl>\n')
+        fileWriter.write('    </Pair>\n')
+        fileWriter.write('</StyleMap>\n')
+        fileWriter.write('     <Style id="sn_shaded_dot1">\n')
+        fileWriter.write('      <IconStyle>\n')
+        fileWriter.write('     <color>6414F000</color>\n')
+        fileWriter.write('		<scale>1.2</scale>\n')
+        fileWriter.write('     <Icon>\n')
+        fileWriter.write('     <href>http://maps.google.com/mapfiles/kml/shapes/shaded_dot.png</href>\n')
+        fileWriter.write('    </Icon>\n')
+        fileWriter.write('	</IconStyle>\n')
+        fileWriter.write('<LabelStyle>\n')
+        fileWriter.write('<color>0FFFFFF</color>\n')
+        fileWriter.write('</LabelStyle>\n')
+        fileWriter.write('<BalloonStyle>\n')
+        fileWriter.write('</BalloonStyle>\n')
+        fileWriter.write('<ListStyle>\n')
+        fileWriter.write('</ListStyle>\n')
+        fileWriter.write('</Style>\n')
+        fileWriter.write('<Style id="sh_shaded_dot1">\n')
+        fileWriter.write('<IconStyle>\n')
+        fileWriter.write('	<color>6414F000</color>\n')
+        fileWriter.write(' <scale>1.4</scale>\n')
+        fileWriter.write('	<Icon>\n')
+        fileWriter.write('		<href>http://maps.google.com/mapfiles/kml/shapes/shaded_dot.png</href>\n')
+        fileWriter.write('	</Icon>\n')
+        fileWriter.write(' </IconStyle>\n')
+        fileWriter.write('<LabelStyle>\n')
+        fileWriter.write('	<color>0FFFFFF</color>\n')
+        fileWriter.write('</LabelStyle>\n')
+        fileWriter.write('<BalloonStyle>\n')
+        fileWriter.write('</BalloonStyle>\n')
+        fileWriter.write('<ListStyle>\n')
+        fileWriter.write('   </ListStyle>\n')
+        fileWriter.write('</Style>\n')
 
+        fileWriter.write('<StyleMap id="msn_shaded_dot2">\n')
+        fileWriter.write('	<Pair>\n')
+        fileWriter.write('	<key>normal</key>\n')
+        fileWriter.write('  <styleUrl>#sn_shaded_dot2</styleUrl>\n')
+        fileWriter.write('	</Pair>\n')
+        fileWriter.write('   <Pair>\n')
+        fileWriter.write('   <key>highlight</key>\n')
+        fileWriter.write('		<styleUrl>#sh_shaded_dot2</styleUrl>\n')
+        fileWriter.write('    </Pair>\n')
+        fileWriter.write('</StyleMap>\n')
+        fileWriter.write('     <Style id="sn_shaded_dot2">\n')
+        fileWriter.write('      <IconStyle>\n')
+        fileWriter.write('     <color>6414F078</color>\n')
+        fileWriter.write('		<scale>1.2</scale>\n')
+        fileWriter.write('     <Icon>\n')
+        fileWriter.write('     <href>http://maps.google.com/mapfiles/kml/shapes/shaded_dot.png</href>\n')
+        fileWriter.write('    </Icon>\n')
+        fileWriter.write('	</IconStyle>\n')
+        fileWriter.write('<LabelStyle>\n')
+        fileWriter.write('<color>0FFFFFF</color>\n')
+        fileWriter.write('</LabelStyle>\n')
+        fileWriter.write('<BalloonStyle>\n')
+        fileWriter.write('</BalloonStyle>\n')
+        fileWriter.write('<ListStyle>\n')
+        fileWriter.write('</ListStyle>\n')
+        fileWriter.write('</Style>\n')
+        fileWriter.write('<Style id="sh_shaded_dot2">\n')
+        fileWriter.write('<IconStyle>\n')
+        fileWriter.write('	<color>6414F078</color>\n')
+        fileWriter.write(' <scale>1.4</scale>\n')
+        fileWriter.write('	<Icon>\n')
+        fileWriter.write('		<href>http://maps.google.com/mapfiles/kml/shapes/shaded_dot.png</href>\n')
+        fileWriter.write('	</Icon>\n')
+        fileWriter.write(' </IconStyle>\n')
+        fileWriter.write('<LabelStyle>\n')
+        fileWriter.write('	<color>0FFFFFF</color>\n')
+        fileWriter.write('</LabelStyle>\n')
+        fileWriter.write('<BalloonStyle>\n')
+        fileWriter.write('</BalloonStyle>\n')
+        fileWriter.write('<ListStyle>\n')
+        fileWriter.write('   </ListStyle>\n')
+        fileWriter.write('</Style>\n')
+
+        fileWriter.write('<StyleMap id="msn_shaded_dot3">\n')
+        fileWriter.write('	<Pair>\n')
+        fileWriter.write('	<key>normal</key>\n')
+        fileWriter.write('  <styleUrl>#sn_shaded_dot3</styleUrl>\n')
+        fileWriter.write('	</Pair>\n')
+        fileWriter.write('   <Pair>\n')
+        fileWriter.write('   <key>highlight</key>\n')
+        fileWriter.write('		<styleUrl>#sh_shaded_dot3</styleUrl>\n')
+        fileWriter.write('    </Pair>\n')
+        fileWriter.write('</StyleMap>\n')
+        fileWriter.write('     <Style id="sn_shaded_dot3">\n')
+        fileWriter.write('      <IconStyle>\n')
+        fileWriter.write('     <color>6414F0FF</color>\n')
+        fileWriter.write('		<scale>1.2</scale>\n')
+        fileWriter.write('     <Icon>\n')
+        fileWriter.write('     <href>http://maps.google.com/mapfiles/kml/shapes/shaded_dot.png</href>\n')
+        fileWriter.write('    </Icon>\n')
+        fileWriter.write('	</IconStyle>\n')
+        fileWriter.write('<LabelStyle>\n')
+        fileWriter.write('<color>0FFFFFF</color>\n')
+        fileWriter.write('</LabelStyle>\n')
+        fileWriter.write('<BalloonStyle>\n')
+        fileWriter.write('</BalloonStyle>\n')
+        fileWriter.write('<ListStyle>\n')
+        fileWriter.write('</ListStyle>\n')
+        fileWriter.write('</Style>\n')
+        fileWriter.write('<Style id="sh_shaded_dot3">\n')
+        fileWriter.write('<IconStyle>\n')
+        fileWriter.write('	<color>6414F0FF</color>\n')
+        fileWriter.write(' <scale>1.4</scale>\n')
+        fileWriter.write('	<Icon>\n')
+        fileWriter.write('		<href>http://maps.google.com/mapfiles/kml/shapes/shaded_dot.png</href>\n')
+        fileWriter.write('	</Icon>\n')
+        fileWriter.write(' </IconStyle>\n')
+        fileWriter.write('<LabelStyle>\n')
+        fileWriter.write('	<color>0FFFFFF</color>\n')
+        fileWriter.write('</LabelStyle>\n')
+        fileWriter.write('<BalloonStyle>\n')
+        fileWriter.write('</BalloonStyle>\n')
+        fileWriter.write('<ListStyle>\n')
+        fileWriter.write('   </ListStyle>\n')
+        fileWriter.write('</Style>\n')
+
+        fileWriter.write('<StyleMap id="msn_shaded_dot4">\n')
+        fileWriter.write('	<Pair>\n')
+        fileWriter.write('	<key>normal</key>\n')
+        fileWriter.write('  <styleUrl>#sn_shaded_dot4</styleUrl>\n')
+        fileWriter.write('	</Pair>\n')
+        fileWriter.write('   <Pair>\n')
+        fileWriter.write('   <key>highlight</key>\n')
+        fileWriter.write('		<styleUrl>#sh_shaded_dot4</styleUrl>\n')
+        fileWriter.write('    </Pair>\n')
+        fileWriter.write('</StyleMap>\n')
+        fileWriter.write('     <Style id="sn_shaded_dot4">\n')
+        fileWriter.write('      <IconStyle>\n')
+        fileWriter.write('     <color>6414B4FF</color>\n')
+        fileWriter.write('		<scale>1.2</scale>\n')
+        fileWriter.write('     <Icon>\n')
+        fileWriter.write('     <href>http://maps.google.com/mapfiles/kml/shapes/shaded_dot.png</href>\n')
+        fileWriter.write('    </Icon>\n')
+        fileWriter.write('	</IconStyle>\n')
+        fileWriter.write('<LabelStyle>\n')
+        fileWriter.write('<color>0FFFFFF</color>\n')
+        fileWriter.write('</LabelStyle>\n')
+        fileWriter.write('<BalloonStyle>\n')
+        fileWriter.write('</BalloonStyle>\n')
+        fileWriter.write('<ListStyle>\n')
+        fileWriter.write('</ListStyle>\n')
+        fileWriter.write('</Style>\n')
+        fileWriter.write('<Style id="sh_shaded_dot4">\n')
+        fileWriter.write('<IconStyle>\n')
+        fileWriter.write('	<color>6414B4FF</color>\n')
+        fileWriter.write(' <scale>1.4</scale>\n')
+        fileWriter.write('	<Icon>\n')
+        fileWriter.write('		<href>http://maps.google.com/mapfiles/kml/shapes/shaded_dot.png</href>\n')
+        fileWriter.write('	</Icon>\n')
+        fileWriter.write(' </IconStyle>\n')
+        fileWriter.write('<LabelStyle>\n')
+        fileWriter.write('	<color>0FFFFFF</color>\n')
+        fileWriter.write('</LabelStyle>\n')
+        fileWriter.write('<BalloonStyle>\n')
+        fileWriter.write('</BalloonStyle>\n')
+        fileWriter.write('<ListStyle>\n')
+        fileWriter.write('   </ListStyle>\n')
+        fileWriter.write('</Style>\n')
+
+        fileWriter.write('<StyleMap id="msn_shaded_dot5">\n')
+        fileWriter.write('	<Pair>\n')
+        fileWriter.write('	<key>normal</key>\n')
+        fileWriter.write('  <styleUrl>#sn_shaded_dot5</styleUrl>\n')
+        fileWriter.write('	</Pair>\n')
+        fileWriter.write('   <Pair>\n')
+        fileWriter.write('   <key>highlight</key>\n')
+        fileWriter.write('		<styleUrl>#sh_shaded_dot5</styleUrl>\n')
+        fileWriter.write('    </Pair>\n')
+        fileWriter.write('</StyleMap>\n')
+        fileWriter.write('     <Style id="sn_shaded_dot5">\n')
+        fileWriter.write('      <IconStyle>\n')
+        fileWriter.write('     <color>641478FF</color>\n')
+        fileWriter.write('		<scale>1.2</scale>\n')
+        fileWriter.write('     <Icon>\n')
+        fileWriter.write('     <href>http://maps.google.com/mapfiles/kml/shapes/shaded_dot.png</href>\n')
+        fileWriter.write('    </Icon>\n')
+        fileWriter.write('	</IconStyle>\n')
+        fileWriter.write('<LabelStyle>\n')
+        fileWriter.write('<color>0FFFFFF</color>\n')
+        fileWriter.write('</LabelStyle>\n')
+        fileWriter.write('<BalloonStyle>\n')
+        fileWriter.write('</BalloonStyle>\n')
+        fileWriter.write('<ListStyle>\n')
+        fileWriter.write('</ListStyle>\n')
+        fileWriter.write('</Style>\n')
+        fileWriter.write('<Style id="sh_shaded_dot5">\n')
+        fileWriter.write('<IconStyle>\n')
+        fileWriter.write('	<color>641478FF</color>\n')
+        fileWriter.write(' <scale>1.4</scale>\n')
+        fileWriter.write('	<Icon>\n')
+        fileWriter.write('		<href>http://maps.google.com/mapfiles/kml/shapes/shaded_dot.png</href>\n')
+        fileWriter.write('	</Icon>\n')
+        fileWriter.write(' </IconStyle>\n')
+        fileWriter.write('<LabelStyle>\n')
+        fileWriter.write('	<color>0FFFFFF</color>\n')
+        fileWriter.write('</LabelStyle>\n')
+        fileWriter.write('<BalloonStyle>\n')
+        fileWriter.write('</BalloonStyle>\n')
+        fileWriter.write('<ListStyle>\n')
+        fileWriter.write('   </ListStyle>\n')
+        fileWriter.write('</Style>\n')
+
+        fileWriter.write('<StyleMap id="msn_shaded_dot6">\n')
+        fileWriter.write('	<Pair>\n')
+        fileWriter.write('	<key>normal</key>\n')
+        fileWriter.write('  <styleUrl>#sn_shaded_dot6</styleUrl>\n')
+        fileWriter.write('	</Pair>\n')
+        fileWriter.write('   <Pair>\n')
+        fileWriter.write('   <key>highlight</key>\n')
+        fileWriter.write('		<styleUrl>#sh_shaded_dot6</styleUrl>\n')
+        fileWriter.write('    </Pair>\n')
+        fileWriter.write('</StyleMap>\n')
+        fileWriter.write('     <Style id="sn_shaded_dot6">\n')
+        fileWriter.write('      <IconStyle>\n')
+        fileWriter.write('     <color>64143CFF</color>\n')
+        fileWriter.write('		<scale>1.2</scale>\n')
+        fileWriter.write('     <Icon>\n')
+        fileWriter.write('     <href>http://maps.google.com/mapfiles/kml/shapes/shaded_dot.png</href>\n')
+        fileWriter.write('    </Icon>\n')
+        fileWriter.write('	</IconStyle>\n')
+        fileWriter.write('<LabelStyle>\n')
+        fileWriter.write('<color>0FFFFFF</color>\n')
+        fileWriter.write('</LabelStyle>\n')
+        fileWriter.write('<BalloonStyle>\n')
+        fileWriter.write('</BalloonStyle>\n')
+        fileWriter.write('<ListStyle>\n')
+        fileWriter.write('</ListStyle>\n')
+        fileWriter.write('</Style>\n')
+        fileWriter.write('<Style id="sh_shaded_dot6">\n')
+        fileWriter.write('<IconStyle>\n')
+        fileWriter.write('	<color>64143CFF</color>\n')
+        fileWriter.write(' <scale>1.4</scale>\n')
+        fileWriter.write('	<Icon>\n')
+        fileWriter.write('		<href>http://maps.google.com/mapfiles/kml/shapes/shaded_dot.png</href>\n')
+        fileWriter.write('	</Icon>\n')
+        fileWriter.write(' </IconStyle>\n')
+        fileWriter.write('<LabelStyle>\n')
+        fileWriter.write('	<color>0FFFFFF</color>\n')
+        fileWriter.write('</LabelStyle>\n')
+        fileWriter.write('<BalloonStyle>\n')
+        fileWriter.write('</BalloonStyle>\n')
+        fileWriter.write('<ListStyle>\n')
+        fileWriter.write('   </ListStyle>\n')
+        fileWriter.write('</Style>\n')
+
+        fileWriter.write('<StyleMap id="msn_shaded_dot7">\n')
+        fileWriter.write('	<Pair>\n')
+        fileWriter.write('	<key>normal</key>\n')
+        fileWriter.write('  <styleUrl>#sn_shaded_dot7</styleUrl>\n')
+        fileWriter.write('	</Pair>\n')
+        fileWriter.write('   <Pair>\n')
+        fileWriter.write('   <key>highlight</key>\n')
+        fileWriter.write('		<styleUrl>#sh_shaded_dot7</styleUrl>\n')
+        fileWriter.write('    </Pair>\n')
+        fileWriter.write('</StyleMap>\n')
+        fileWriter.write('     <Style id="sn_shaded_dot7">\n')
+        fileWriter.write('      <IconStyle>\n')
+        fileWriter.write('     <color>641400FF</color>\n')
+        fileWriter.write('		<scale>1.2</scale>\n')
+        fileWriter.write('     <Icon>\n')
+        fileWriter.write('     <href>http://maps.google.com/mapfiles/kml/shapes/shaded_dot.png</href>\n')
+        fileWriter.write('    </Icon>\n')
+        fileWriter.write('	</IconStyle>\n')
+        fileWriter.write('<LabelStyle>\n')
+        fileWriter.write('<color>0FFFFFF</color>\n')
+        fileWriter.write('</LabelStyle>\n')
+        fileWriter.write('<BalloonStyle>\n')
+        fileWriter.write('</BalloonStyle>\n')
+        fileWriter.write('<ListStyle>\n')
+        fileWriter.write('</ListStyle>\n')
+        fileWriter.write('</Style>\n')
+        fileWriter.write('<Style id="sh_shaded_dot7">\n')
+        fileWriter.write('<IconStyle>\n')
+        fileWriter.write('	<color>641400FF</color>\n')
+        fileWriter.write(' <scale>1.4</scale>\n')
+        fileWriter.write('	<Icon>\n')
+        fileWriter.write('		<href>http://maps.google.com/mapfiles/kml/shapes/shaded_dot.png</href>\n')
+        fileWriter.write('	</Icon>\n')
+        fileWriter.write(' </IconStyle>\n')
+        fileWriter.write('<LabelStyle>\n')
+        fileWriter.write('	<color>0FFFFFF</color>\n')
+        fileWriter.write('</LabelStyle>\n')
+        fileWriter.write('<BalloonStyle>\n')
+        fileWriter.write('</BalloonStyle>\n')
+        fileWriter.write('<ListStyle>\n')
+        fileWriter.write('   </ListStyle>\n')
+        fileWriter.write('</Style>\n')
+
+
+        GeometryFactory gf = new GeometryFactory()
+        CRSFactory cRSFactory = new CRSFactory()
+
+        RegistryManager registryManager = cRSFactory.getRegistryManager()
+        registryManager.addRegistry(new EPSGRegistry())
+
+        CoordinateReferenceSystem inputCRS = cRSFactory.getCRS("EPSG:2154")
+        CoordinateReferenceSystem targetCRS = cRSFactory.getCRS("EPSG:4326")
+        List<GeometryEditor.CoordinateOperation> op = CoordinateOperationFactory.createCoordinateOperations((GeodeticCRS) inputCRS, (GeodeticCRS) targetCRS)
+
+        Iterator it = Result_by_receivers.entrySet().iterator()
+        while (it.hasNext()) {
+            Map.Entry pair = (Map.Entry) it.next()
+            Integer idReceiver = pair.getKey()
+            Double Res = pair.getValue()
+            Coordinate coordinate = receivers.get(idReceiver)
+
+            fileWriter.write('\t<Placemark>\n')
+            fileWriter.write('\t<name>Result</name>')
+            fileWriter.write('\t\t<description>'+ Res.toString() +'</description>\n')
+            fileWriter.write('\t\t<styleUrl>#msn_shaded_dot'+ (Math.round((Res-50)*15/100)).toString() +'</styleUrl>\n')
+            fileWriter.write('\t\t<Point>\n')
+            fileWriter.write('\t\t	<altitudeMode>relativeToGround</altitudeMode>\n')
+            fileWriter.write('\t\t<gx:drawOrder>1</gx:drawOrder>\n')
+            fileWriter.write('\t\t<coordinates>')
+
+            double z = mesh.getHeightAtPosition(coordinate)
+
+            Geometry outPutGeom = (Point) gf.createPoint(coordinate).copy()
+            outPutGeom.geometryChanged()
+            outPutGeom.apply(new ST_Transform.CRSTransformFilter(op.get(0)))
+            outPutGeom.setSRID(4326)
+            Coordinate coordinate2 = outPutGeom.getCoordinate()
+            fileWriter.write("\t\t\t" + coordinate2.x.toString() + "," + coordinate2.y.toString() + "," + (coordinate.z - z).toString() + "\n")
+
+
+            fileWriter.write('\t\t\t</coordinates>\n')
+            fileWriter.write('\t\t\t</Point>\n')
+            fileWriter.write('\t</Placemark>\n')
+        }
+        it.remove()
+        fileWriter.write('\t</Document>\n')
+        fileWriter.write('</kml>')
+        fileWriter.close()
+}
 
 /**
  * Permet de tracer les rayons dans un vtk lisible dans paraview
@@ -986,7 +1360,7 @@ class OneRun {
                 outPutGeom.setSRID(4326)
                 Coordinate coordinate2 = outPutGeom.getCoordinate()
 
-                fileWriter.write("\t\t\t"+coordinate2.x.toString()+","+ coordinate2.y.toString()+","+ (height).toString() +"\n")
+                fileWriter.write("\t\t\t" + coordinate2.x.toString() + "," + coordinate2.y.toString() + "," + (height).toString() + "\n")
             }
 
             fileWriter.write('\t\t\t</coordinates>\n')
