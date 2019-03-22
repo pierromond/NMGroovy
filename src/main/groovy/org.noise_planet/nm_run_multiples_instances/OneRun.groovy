@@ -98,7 +98,7 @@ class OneRun {
         //|- config
 
         boolean clean = true // reset the postgis database
-        boolean printply = false // sort un ply de la zone
+        boolean printply = true // sort un ply de la zone
         boolean saveRays = true
         boolean loadRays = false
         int batrec = 2
@@ -141,7 +141,7 @@ class OneRun {
 
         // Paramètres de propagation
         int reflexion_order = 1
-        int diffraction_order = 0
+        int diffraction_order = 10
         double max_src_dist = 500
         double max_ref_dist = 500
         double min_ref_dist = 1.0
@@ -282,7 +282,7 @@ class OneRun {
                 String filename3 = workspace_output + "\\" + zone_name + ".kml"
                 try {
                    // writePLY(filename2, mesh)
-                    writeKML(filename3, mesh)
+                    writeKML(filename3, mesh, manager)
                 } catch (IOException e) {
                     e.printStackTrace()
                 }
@@ -439,6 +439,7 @@ class OneRun {
             // la base de données pour pouvoir lire ça sert pas à grand chose
             // et ça prend beaucoup de temps de calcul, donc c'est optimisable
             System.out.println("Load Sources in Pgis...")
+
             fetchCellSource_withindex(connection, null, sourceGeometries, sources_table_name, sourcesPk, wj_sources, sourcesIndex)
 
             if (!loadRays){
@@ -452,7 +453,7 @@ class OneRun {
                 double[] energeticSum = new double[8]
 
                 // ici on configure les data pour tirer les rayons
-                PropagationProcessData rayData = new PropagationProcessData(new ArrayList<Coordinate>(), manager, sourcesIndex, sourceGeometries, wj_sources, db_field_freq, 1, 0, 500, 500, 1.0, 0.2, favrose2, 0.1, 0, null, geoWithSoilTypeList, true)
+                PropagationProcessData rayData = new PropagationProcessData(new ArrayList<Coordinate>(), manager, sourcesIndex, sourceGeometries, wj_sources, db_field_freq, reflexion_order, diffraction_order, max_src_dist, max_ref_dist, min_ref_dist, wall_alpha, favrose2, forget_source, 0, null, geoWithSoilTypeList, true)
                 // phase d'init
                 rayData.makeRelativeZToAbsoluteOnlySources()
 
@@ -788,10 +789,10 @@ class OneRun {
                 outPutGeom.geometryChanged()
                 outPutGeom.apply(new ST_Transform.CRSTransformFilter(op.get(0)))
                 outPutGeom.setSRID(4326)
-                Coordinate coordinate = outPutGeom.getCoordinates()
+                Coordinate coordinate = outPutGeom.getCoordinate()
 
 
-                fileWriter.write("\t\t\t"+coordinate.x.toString()+","+ coordinate.y.toString()+","+ p.coordinate.z - z +"\n")
+                fileWriter.write("\t\t\t"+coordinate.x.toString()+","+ coordinate.y.toString()+","+ (p.coordinate.z - z).toString() +"\n")
 
             }
             fileWriter.write('\t\t\t</coordinates>\n')
@@ -927,7 +928,7 @@ class OneRun {
  * @throws LayerDelaunayError
  */
 
-    private void writeKML(String filename, MeshBuilder mesh) throws IOException, LayerDelaunayError {
+    private void writeKML(String filename, MeshBuilder mesh, FastObstructionTest manager) throws IOException, LayerDelaunayError {
 
         PointsMerge pointsMerge = new PointsMerge(0.01)
         List<Geometry> triVertices2 = new ArrayList<>()
@@ -946,7 +947,7 @@ class OneRun {
         fileWriter.write('<kml xmlns="http://www.opengis.net/kml/2.2">\n')
         fileWriter.write('<Document>\n')
         CRSFactory cRSFactory = new CRSFactory()
-
+        GeometryFactory gf = new GeometryFactory()
         RegistryManager registryManager = cRSFactory.getRegistryManager()
         registryManager.addRegistry(new EPSGRegistry())
 
@@ -968,18 +969,24 @@ class OneRun {
             fileWriter.write('\t\t\t<coordinates>\n')
             double height = polygon.getHeight()
 
-            Geometry building = (Polygon) polygon.getGeometry()
-            Geometry outPutGeom = building.copy()
-            outPutGeom.geometryChanged()
-            outPutGeom.apply(new ST_Transform.CRSTransformFilter(op.get(0)))
-            outPutGeom.setSRID(4326)
+            //Geometry building = (Polygon) polygon.getGeometry()
+            //Geometry outPutGeom = building.copy()
+            //outPutGeom.geometryChanged()
+            //outPutGeom.apply(new ST_Transform.CRSTransformFilter(op.get(0)))
+            //outPutGeom.setSRID(4326)
 
-           // GeometryCollection buildingExtruded = GeometryExtrude.extrudePolygonAsGeometry((Polygon) polygon.getGeometry(), polygon.getHeight())
-           // addGeometry(triVertices2, buildingExtruded)
+            // addGeometry(triVertices2, buildingExtruded)
 
-            for (Coordinate coordinate : outPutGeom.getCoordinates()) {
+            for (Coordinate coordinate : polygon.getGeometry().getCoordinates()) {
 
-                fileWriter.write("\t\t\t"+coordinate.x.toString()+","+ coordinate.y.toString()+","+ height +"\n")
+                double z = manager.getHeightAtPosition(coordinate)
+                Geometry outPutGeom = (Point) gf.createPoint(coordinate).copy()
+                outPutGeom.geometryChanged()
+                outPutGeom.apply(new ST_Transform.CRSTransformFilter(op.get(0)))
+                outPutGeom.setSRID(4326)
+                Coordinate coordinate2 = outPutGeom.getCoordinate()
+
+                fileWriter.write("\t\t\t"+coordinate2.x.toString()+","+ coordinate2.y.toString()+","+ (height).toString() +"\n")
             }
 
             fileWriter.write('\t\t\t</coordinates>\n')
