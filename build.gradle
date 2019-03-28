@@ -17,6 +17,14 @@ dependencies {
     compile fileTree(include: ['*.jar'], dir: 'libs')
 }
 
+
+task run_OnlyEmission(type: JavaExec) {
+    classpath sourceSets.main.runtimeClasspath
+    main = "org.noise_planet.nm_run_multiples_instances.OnlyEmission"
+    // args "arg1", "arg2"
+}
+
+
 task run_OneRun(type: JavaExec) {
     classpath sourceSets.main.runtimeClasspath
     main = "org.noise_planet.nm_run_multiples_instances.OneRun"
