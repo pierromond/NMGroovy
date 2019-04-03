@@ -41,6 +41,8 @@ import org.locationtech.jts.geom.Point
 import org.locationtech.jts.geom.Polygon
 import org.locationtech.jts.geom.impl.CoordinateArraySequence
 import org.locationtech.jts.geom.util.GeometryEditor
+import org.locationtech.jts.operation.buffer.BufferOp
+import org.locationtech.jts.operation.buffer.BufferParameters
 import org.orbisgis.noisemap.core.ComputeRays
 import org.orbisgis.noisemap.core.ComputeRaysOut
 import org.orbisgis.noisemap.core.EvaluateAttenuationCnossos
@@ -243,7 +245,7 @@ class OneRun {
                 sql.execute("CALL File_table('/home/nicolas/data/gcbugnoisemodelling/debug_guillaume/shp/occsol.shp','land_use_zone_capteur')")
                 sql.execute("CALL File_table('/home/nicolas/data/gcbugnoisemodelling/debug_guillaume/shp/mntlight.shp','dem_lite2')")
                 sql.execute("CALL File_table('/home/nicolas/data/gcbugnoisemodelling/debug_guillaume/shp/vide.shp','roads_src_zone')")
-                sql.execute("CALL File_table('/home/nicolas/data/gcbugnoisemodelling/debug_guillaume/shp/routes_adapt2.shp','ROADS_TRAFFIC_ZONE_CAPTEUR_format2')")
+                sql.execute("CALL File_table('/home/nicolas/data/gcbugnoisemodelling/debug_guillaume/shp/route_adapt2.shp','ROADS_TRAFFIC_ZONE_CAPTEUR_format2')")
 
                 sql.execute("create spatial index on zone_cense_2km(the_geom)")
                 sql.execute("create spatial index on buildings_zone(the_geom)")
@@ -287,26 +289,8 @@ class OneRun {
             // Importer le Sol
             System.out.println("Altitudes...")
             //sql.execute("alter table full_dem_lite2 rename column geom to the_geom;")
-            fetchCellDem(connection, mesh, topo_table_name, "contour")
+            cellEnvelope.expandToInclude(fetchCellDem(connection, mesh, topo_table_name, "contour"))
 
-            System.out.println("Start delaunay triangulation...")
-            mesh.finishPolygonFeeding(cellEnvelope)
-            System.out.println("End delaunay triangulation.")
-            FastObstructionTest manager = new FastObstructionTest(mesh.getPolygonWithHeight(), mesh.getTriangles(),
-                    mesh.getTriNeighbors(), mesh.getVertices())
-
-            // Ecriture de la topo dans un fichier polygon ouvrable avec paraview par exemple
-            if (printply) {
-                System.out.println("Impression en cours...")
-                String filename2 = workspace_output + "\\" + zone_name + ".ply"
-                String filename3 = workspace_output + "\\" + zone_name + ".kml"
-                try {
-                    // writePLY(filename2, mesh)
-                    writeKML(filename3, mesh, manager)
-                } catch (IOException e) {
-                    e.printStackTrace()
-                }
-            }
 
             // import sources
             List<Long> sourcesPk = new ArrayList<>()
@@ -320,6 +304,10 @@ class OneRun {
             Set<Long> computedReceivers = new HashSet<Long>()
             List<Coordinate> receivers = new ArrayList<>()
             receiversPk = fetchCellReceiver_withindex(connection, receivers_table_name, receivers, computedReceivers)
+
+            for(Coordinate receiver : receivers) {
+                cellEnvelope.expandToInclude(receiver)
+            }
 
             // init du vecteur de fréquences
             List<Integer> db_field_freq = [63, 125, 250, 500, 1000, 2000, 4000, 8000]
@@ -460,7 +448,30 @@ class OneRun {
             // et ça prend beaucoup de temps de calcul, donc c'est optimisable
             System.out.println("Load Sources in Pgis...")
 
-            fetchCellSource_withindex(connection, null, sourceGeometries, sources_table_name, sourcesPk, wj_sources, sourcesIndex)
+            cellEnvelope.expandToInclude(fetchCellSource_withindex(connection, null, sourceGeometries, sources_table_name, sourcesPk, wj_sources, sourcesIndex))
+
+            cellEnvelope.expandBy(max_src_dist)
+
+            System.out.println("Start delaunay triangulation...")
+            mesh.finishPolygonFeeding(cellEnvelope)
+            System.out.println("End delaunay triangulation.")
+
+
+            FastObstructionTest manager = new FastObstructionTest(mesh.getPolygonWithHeight(), mesh.getTriangles(),
+                    mesh.getTriNeighbors(), mesh.getVertices())
+
+            // Ecriture de la topo dans un fichier polygon ouvrable avec paraview par exemple
+            if (printply) {
+                System.out.println("Impression en cours...")
+                String filename2 = workspace_output + "\\" + zone_name + ".ply"
+                String filename3 = workspace_output + "\\" + zone_name + ".kml"
+                try {
+                    // writePLY(filename2, mesh)
+                    writeKML(filename3, mesh, manager)
+                } catch (IOException e) {
+                    e.printStackTrace()
+                }
+            }
 
             if (!loadRays) {
                 System.out.println("Compute Rays...")
@@ -493,11 +504,9 @@ class OneRun {
                     if (!propDataOut.getPropagationPaths().isEmpty()) {
                         propaMap.put(pk, propDataOut)
                         // Ca c'est pour voir les rayons, je met en commentaire mais ça peut s'activer
-                        String filename = "D:/results/" + pk.toString() + ".vtk"
-                        String filenameKML = "D:/results/" + pk.toString() + ".kml"
+                        String filenameKML = workspace_output + pk.toString() + ".kml"
                         try {
-                            //writeVTK(filename, propDataOut)
-                            writeKML_Line(filenameKML, propDataOut, manager)
+                            //writeKML_Line(filenameKML, propDataOut, manager)
                         } catch (IOException e) {
                             e.printStackTrace()
                         }
@@ -1404,20 +1413,21 @@ class OneRun {
  * @param zField
  * @throws SQLException
  */
-    protected void fetchCellDem(Connection connection, MeshBuilder mesh, String buildingsTableName, String zField) throws SQLException {
+    protected Envelope fetchCellDem(Connection connection, MeshBuilder mesh, String buildingsTableName, String zField) throws SQLException {
 
         PreparedStatement st = connection.prepareStatement(
                 "SELECT the_geom, " + zField + " FROM " +
                         buildingsTableName)
-
+        Envelope demEnvelope = new Envelope()
         SpatialResultSet rs = st.executeQuery().unwrap(SpatialResultSet.class)
         while (rs.next()) {
             Geometry pt = rs.getGeometry()
             if (pt != null) {
+                demEnvelope.expandToInclude(pt.getCoordinate())
                 mesh.addTopographicPoint(new Coordinate(pt.getCoordinate().x, pt.getCoordinate().y, rs.getDouble(zField)))
             }
         }
-
+        return demEnvelope
     }
 
 /**
@@ -1470,17 +1480,19 @@ class OneRun {
  * @param sourcesIndex
  * @throws SQLException
  */
-    protected void fetchCellSource_withindex(Connection connection, List<Geometry> allSourceGeometries,
+    protected Envelope fetchCellSource_withindex(Connection connection, List<Geometry> allSourceGeometries,
                                              List<Geometry> sourceGeometries, String sourcesTableName, List<Long> sourcePk, List<ArrayList<Double>> wj_sources, QueryGeometryStructure sourcesIndex) throws SQLException {
         double[] db_field_ids = [3, 4, 5, 6, 7, 8, 9, 10]
         int idSource = 0
         PreparedStatement st = connection.prepareStatement("SELECT * FROM " + sourcesTableName)
         SpatialResultSet rs = st.executeQuery().unwrap(SpatialResultSet.class)
+        Envelope env = new Envelope()
         while (rs.next()) {
             Geometry geo = rs.getGeometry()
             // todo get primarykey as for receiver, for the moment take only the first column
             sourcePk.add(rs.getLong(1))
             if (geo != null) {
+                env.expandToInclude(geo.getEnvelopeInternal())
                 ArrayList<Double> wj_spectrum = new ArrayList<>()
 
                 double sumPow = 0
@@ -1500,6 +1512,7 @@ class OneRun {
                 }
             }
         }
+        return env
     }
 
 /**
@@ -1551,12 +1564,16 @@ class OneRun {
                         buildingsTableName)
 
         SpatialResultSet rs = st.executeQuery().unwrap(SpatialResultSet.class)
+        BufferParameters bp = new BufferParameters()
+        bp.setJoinStyle(BufferParameters.JOIN_BEVEL)
+        bp.setEndCapStyle(BufferParameters.CAP_SQUARE)
         while (rs.next()) {
             //if we don't have height of building
             Geometry building = rs.getGeometry()
             if (building != null) {
-                if (building instanceof Polygon || building instanceof MultiPolygon) {
-                    building = building.buffer(0.2)
+                if ((building instanceof Polygon || building instanceof MultiPolygon) && rs.getDouble(heightField) > 0) {
+                    BufferOp bufferOp = new BufferOp(building, bp)
+                    building = bufferOp.getResultGeometry(0.2)
                     mesh.addGeometry(building,
                             heightField.isEmpty() ? Double.MAX_VALUE : rs.getDouble(heightField),
                             fetchAlpha ? rs.getDouble(ALPHA_FIELD_NAME) : wallAbsorption)
