@@ -147,7 +147,7 @@ class OneRun {
         String rootPath = scriptLocation.getParent().getParent().getParent().getParent().toString()
 
         // Paramètres de propagation
-        int reflexion_order = 0
+        int reflexion_order = 1
         int diffraction_order = 100
         double max_src_dist = 4000
         double max_ref_dist = 100
