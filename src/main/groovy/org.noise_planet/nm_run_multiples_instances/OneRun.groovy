@@ -91,7 +91,7 @@ class OneRun {
  ///////////////////////////////////////////
 
  */
-        String workspace_output = "/home/nicolas/data/gcbugnoisemodelling/debug_guillaume/output/"
+        String workspace_output = "D:\\output"
         // le workspace output doit respecter une arborescence specifique
         //output
         //|- data
@@ -117,7 +117,7 @@ class OneRun {
             user_password = "12345678"
         } else {
             // Ouverture de la base de données H2 qui recueillera les infos
-            def database_path = "/home/nicolas/data/gcbugnoisemodelling/debug_guillaume/database"
+            def database_path = "D:\\db\\database"
             def database_file = new File(database_path+".mv.db")
             if (database_file.exists()) {
                 database_file.delete()
@@ -239,13 +239,13 @@ class OneRun {
                 sql.execute('drop table roads_src_zone if exists ')
                 sql.execute('drop table ROADS_TRAFFIC_ZONE_CAPTEUR_format2 if exists ')
 
-                sql.execute("CALL File_table('/home/nicolas/data/gcbugnoisemodelling/debug_guillaume/shp/zone.shp','zone_cense_2km')")
-                sql.execute("CALL File_table('/home/nicolas/data/gcbugnoisemodelling/debug_guillaume/shp/batiments.shp','buildings_zone')")
-                sql.execute("CALL File_table('/home/nicolas/data/gcbugnoisemodelling/debug_guillaume/shp/recepteurs_forestiers.shp','receivers2')")
-                sql.execute("CALL File_table('/home/nicolas/data/gcbugnoisemodelling/debug_guillaume/shp/occsol.shp','land_use_zone_capteur')")
-                sql.execute("CALL File_table('/home/nicolas/data/gcbugnoisemodelling/debug_guillaume/shp/mntlight.shp','dem_lite2')")
-                sql.execute("CALL File_table('/home/nicolas/data/gcbugnoisemodelling/debug_guillaume/shp/vide.shp','roads_src_zone')")
-                sql.execute("CALL File_table('/home/nicolas/data/gcbugnoisemodelling/debug_guillaume/shp/route_adapt2.shp','ROADS_TRAFFIC_ZONE_CAPTEUR_format2')")
+                sql.execute("CALL File_table('D:/aumond/Documents/Recherche_hors_projet/2019_03_GCorbeau_Oiseaux/LastRun/couches_clean1/zone.shp','zone_cense_2km')")
+                sql.execute("CALL File_table('D:/aumond/Documents/Recherche_hors_projet/2019_03_GCorbeau_Oiseaux/LastRun/couches_clean1/batiments.shp','buildings_zone')")
+                sql.execute("CALL File_table('D:/aumond/Documents/Recherche_hors_projet/2019_03_GCorbeau_Oiseaux/LastRun/couches_clean1/occsol.shp','land_use_zone_capteur')")
+                sql.execute("CALL File_table('D:/aumond/Documents/Recherche_hors_projet/2019_03_GCorbeau_Oiseaux/LastRun/couches_clean1/mnt2.shp','dem_lite2')")
+                sql.execute("CALL File_table('D:/aumond/Documents/Recherche_hors_projet/2019_03_GCorbeau_Oiseaux/LastRun/couches_clean1/vide.shp','roads_src_zone')")
+                sql.execute("CALL File_table('D:/aumond/Documents/Recherche_hors_projet/2019_03_GCorbeau_Oiseaux/LastRun/couches_clean1/route_adapt2.shp','ROADS_TRAFFIC_ZONE_CAPTEUR_format2')")
+                sql.execute("CALL File_table('D:/aumond/Documents/Recherche_hors_projet/2019_03_GCorbeau_Oiseaux/LastRun/couches_clean1/foresx.shp','receivers2')")
 
                 sql.execute("create spatial index on zone_cense_2km(the_geom)")
                 sql.execute("create spatial index on buildings_zone(the_geom)")
