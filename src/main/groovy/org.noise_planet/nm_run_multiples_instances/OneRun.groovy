@@ -23,6 +23,7 @@ import org.cts.crs.CoordinateReferenceSystem
 import org.cts.crs.GeodeticCRS
 import org.cts.registry.EPSGRegistry
 import org.cts.registry.RegistryManager
+import org.h2gis.api.ProgressVisitor
 import org.h2gis.functions.spatial.crs.EPSGTuple
 import org.h2gis.functions.spatial.crs.ST_Transform
 import org.h2gis.functions.spatial.volume.GeometryExtrude
@@ -43,32 +44,35 @@ import org.locationtech.jts.geom.impl.CoordinateArraySequence
 import org.locationtech.jts.geom.util.GeometryEditor
 import org.locationtech.jts.operation.buffer.BufferOp
 import org.locationtech.jts.operation.buffer.BufferParameters
-import org.orbisgis.noisemap.core.ComputeRays
-import org.orbisgis.noisemap.core.ComputeRaysOut
-import org.orbisgis.noisemap.core.EvaluateAttenuationCnossos
-import org.orbisgis.noisemap.core.FastObstructionTest
-import org.orbisgis.noisemap.core.GeoWithSoilType
-import org.orbisgis.noisemap.core.LayerDelaunayError
-import org.orbisgis.noisemap.core.MeshBuilder
-import org.orbisgis.noisemap.core.PointsMerge
-import org.orbisgis.noisemap.core.PropagationPath
-import org.orbisgis.noisemap.core.PropagationProcessData
-import org.orbisgis.noisemap.core.PropagationProcessPathData
-import org.orbisgis.noisemap.core.QueryGeometryStructure
-import org.orbisgis.noisemap.core.QueryQuadTree
+import org.noise_planet.noisemodelling.emission.EvaluateRoadSourceCnossos
+import org.noise_planet.noisemodelling.emission.RSParametersCnossos
+import org.noise_planet.noisemodelling.propagation.ComputeRays
+import org.noise_planet.noisemodelling.propagation.ComputeRaysOut
+import org.noise_planet.noisemodelling.propagation.EvaluateAttenuationCnossos
+import org.noise_planet.noisemodelling.propagation.FastObstructionTest
+import org.noise_planet.noisemodelling.propagation.GeoWithSoilType
+import org.noise_planet.noisemodelling.propagation.LayerDelaunayError
+import org.noise_planet.noisemodelling.propagation.MeshBuilder
+import org.noise_planet.noisemodelling.propagation.PointsMerge
+import org.noise_planet.noisemodelling.propagation.PropagationDebugInfo
+import org.noise_planet.noisemodelling.propagation.PropagationPath
+import org.noise_planet.noisemodelling.propagation.PropagationProcessData
+import org.noise_planet.noisemodelling.propagation.PropagationProcessPathData
+import org.noise_planet.noisemodelling.propagation.QueryGeometryStructure
+import org.noise_planet.noisemodelling.propagation.QueryQuadTree
 import org.h2gis.functions.io.csv.CSVDriverFunction
 import org.h2gis.utilities.wrapper.ConnectionWrapper
 import org.cts.op.CoordinateOperationFactory
+import org.noise_planet.noisemodelling.propagation.ThreadPool
+
 import java.sql.Connection
 import java.sql.DriverManager
 import java.sql.PreparedStatement
 import java.sql.SQLException
 
-import org.orbisgis.noisemap.core.EvaluateRoadSourceCnossos
-import org.orbisgis.noisemap.core.RSParametersCnossos
-
 import groovy.time.*
 import java.nio.file.Files
+import java.util.concurrent.TimeUnit
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import org.h2gis.api.EmptyProgressVisitor
@@ -482,43 +486,53 @@ class OneRun {
 
                 // on a pas vraiment besoin de energeticsum, enfin on en discutera
                 double[] energeticSum = new double[8]
-
+                int threadCount = 5
                 // ici on configure les data pour tirer les rayons
-                PropagationProcessData rayData = new PropagationProcessData(new ArrayList<Coordinate>(), manager, sourcesIndex, sourceGeometries, wj_sources, db_field_freq, reflexion_order, diffraction_order, max_src_dist, max_ref_dist, min_ref_dist, wall_alpha, favrose2, forget_source, 0, null, geoWithSoilTypeList, true)
+                //PropagationProcessData rayData = new PropagationProcessData(new ArrayList<Coordinate>(), manager, sourcesIndex, sourceGeometries, wj_sources, db_field_freq, reflexion_order, diffraction_order, max_src_dist, max_ref_dist, min_ref_dist, wall_alpha, favrose2, forget_source, 0, null, geoWithSoilTypeList, true)
+                PropagationProcessData rayData = new PropagationProcessData(manager)
                 // phase d'init
                 rayData.makeRelativeZToAbsoluteOnlySources()
+                rayData.setComputeHorizontalDiffraction(true)
+                rayData.setComputeVerticalDiffraction(true)
+                rayData.reflexionOrder = reflexion_order
+                rayData.maxSrcDist = max_src_dist
+                rayData.maxRefDist = max_ref_dist
 
+
+                for(Coordinate receiver : receivers) {
+                    rayData.addReceiver(new Coordinate(receiver.x, receiver.y, receiver.z + manager.getHeightAtPosition(receiver)))
+                }
+                rayData.setSources(sourcesIndex, sourceGeometries)
                 // et la pour chacun des receptuers, on va chercher les rayons vers les sources
                 //
-                for (int pk = 0; pk < receivers.size(); pk++) {
-                    System.out.println(100 * pk / receivers.size() + " %")
-                    ComputeRaysOut propDataOut = new ComputeRaysOut()
-                    ComputeRays propaProcess = new ComputeRays(rayData, propDataOut)
-                    propaProcess.initStructures()
+                //for (int pk = 0; pk < receivers.size(); pk++) {
+                //System.out.println(100 * pk / receivers.size() + " %")
+                PropagationProcessPathData attData = new PropagationProcessPathData()
+                ComputeRaysOut propDataOut = new ComputeRaysOut(true, attData)
+               // ComputeRays propaProcess = new ComputeRays(rayData, propDataOut)
+                ComputeRays computeRays = new ComputeRays(rayData)
+                computeRays.setThreadCount(threadCount)
+                computeRays.run(propDataOut)
 
-                    receivers.get(pk).setCoordinate(new Coordinate(receivers.get(pk).x, receivers.get(pk).y, receivers.get(pk).z + manager.getHeightAtPosition(receivers.get(pk))))
-                    // Et ici on calcule les rayons
-                    propaProcess.computeRaysAtPosition(receivers.get(pk), receiversPk.get(pk).toInteger(), energeticSum, null)
 
-                    // on stocke dans propaMap
-                    if (!propDataOut.getPropagationPaths().isEmpty()) {
-                        propaMap.put(pk, propDataOut)
-                        // Ca c'est pour voir les rayons, je met en commentaire mais ça peut s'activer
-                        String filenameKML = workspace_output + pk.toString() + ".kml"
-                        try {
-                            //writeKML_Line(filenameKML, propDataOut, manager)
-                        } catch (IOException e) {
-                            e.printStackTrace()
-                        }
-                    }
+
+
+                /*receivers.get(pk).setCoordinate(new Coordinate(receivers.get(pk).x, receivers.get(pk).y, receivers.get(pk).z + manager.getHeightAtPosition(receivers.get(pk))))
+                        rayData.addReceiver(new Coordinate(100, 15, 5));
+        rayData.addSource(factory.createPoint(new Coordinate(50, 10, 1)));
+
+                // Et ici on calcule les rayons
+                propaProcess.computeRaysAtPosition(receivers.get(pk), receiversPk.get(pk).toInteger(), energeticSum, null)
+*/
+
+
                     /* if (propaMap.size()>10){
                          break
                      }*/
-                }
+                //}
             }
 
             // Ici on rentre dans la phase calcul de la matrice de transfer
-            ComputeRaysOut output = new ComputeRaysOut()
             System.out.println("Compute Attenuation...")
 
             Kryo kryo = new Kryo()
@@ -542,7 +556,7 @@ class OneRun {
                   input.close()
               }
   */
-            HashMap<Integer, Double> Result_by_receivers = new HashMap<>()
+            /*HashMap<Integer, Double> Result_by_receivers = new HashMap<>()
             Iterator it = propaMap.entrySet().iterator()
             while (it.hasNext()) {
                 Map.Entry pair = (Map.Entry) it.next()
@@ -550,14 +564,7 @@ class OneRun {
 
                 HashMap<Integer, double[]> aGlobal = new HashMap<>()
 
-
-                PropagationProcessPathData propData = new PropagationProcessPathData()
-                propData.setTemperature(10)
-                propData.setHumidity(70)
-                propData.setPrime2520(true)
-
-                // et c'est cette ligne le coeur de calcul
-                computeWithMeteo(aGlobal, propData, propaMap.get(idReceiver), favrose_22_6)
+                aGlobal = propDataOut.verticesSoundLevel
 
                 // ca c'est pour ecrire dans la table postgre
                 // puisque la combinaison sources + transfer matrix
@@ -590,7 +597,7 @@ class OneRun {
                 }
 
                 it.remove()
-            }
+            }*/
 
 
             if (printresult) {
@@ -1604,5 +1611,50 @@ class OneRun {
             os.close()
         }
     }
+
+    private static class RangeReceiversComputation implements Runnable {
+        private final int startReceiver // Included
+        private final int endReceiver // Excluded
+        private ComputeRays propagationProcess
+        private List<PropagationDebugInfo> debugInfo
+        private ProgressVisitor progressVisitor
+        private ComputeRaysOut dataOut
+        private HashMap<Integer, ComputeRaysOut> propaMap
+
+        RangeReceiversComputation(int startReceiver, int endReceiver, ComputeRays propagationProcess,
+                                         List<PropagationDebugInfo> debugInfo, ProgressVisitor progressVisitor,
+                                         ComputeRaysOut dataOut, HashMap<Integer, ComputeRaysOut> propaMap) {
+            this.startReceiver = startReceiver
+            this.endReceiver = endReceiver
+            this.propagationProcess = propagationProcess
+            this.debugInfo = debugInfo
+            this.progressVisitor = progressVisitor
+            this.dataOut = dataOut
+            this.propaMap = propaMap
+        }
+
+        @Override
+        void run() {
+
+            for (int idReceiver = startReceiver; idReceiver < endReceiver; idReceiver++) {
+                System.out.println(100 * idReceiver / (endReceiver-startReceiver) + " %")
+                Coordinate receiverCoord = propagationProcess.data.receivers.get(idReceiver)
+                propagationProcess.computeRaysAtPosition(receiverCoord, idReceiver, null, debugInfo)
+
+                // on stocke dans propaMap
+                if (!dataOut.getPropagationPaths().isEmpty()) {
+                    propaMap.put(idReceiver, dataOut)
+                }
+
+                if (progressVisitor != null) {
+                    progressVisitor.endStep()
+                }
+            }
+        }
+
+
+    }
+
+
 
 }
