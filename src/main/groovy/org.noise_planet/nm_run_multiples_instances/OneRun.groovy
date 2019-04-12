@@ -64,6 +64,11 @@ import org.h2gis.functions.io.csv.CSVDriverFunction
 import org.h2gis.utilities.wrapper.ConnectionWrapper
 import org.cts.op.CoordinateOperationFactory
 import org.noise_planet.noisemodelling.propagation.ThreadPool
+import org.h2gis.api.ProgressVisitor
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
+
+import java.beans.PropertyChangeListener
 
 import java.sql.Connection
 import java.sql.DriverManager
@@ -121,7 +126,7 @@ class OneRun {
             user_password = "12345678"
         } else {
             // Ouverture de la base de données H2 qui recueillera les infos
-            def database_path = "D:\\db\\database"
+            def database_path = "D:\\db2\\database"
             def database_file = new File(database_path+".mv.db")
             if (database_file.exists()) {
                 database_file.delete()
@@ -153,7 +158,7 @@ class OneRun {
         // Paramètres de propagation
         int reflexion_order = 1
         int diffraction_order = 100
-        double max_src_dist = 4000
+        double max_src_dist = 125
         double max_ref_dist = 100
         double min_ref_dist = 1.0
         double wall_alpha = 0.1 // todo pour le moment cette valeur ne peut pas être changé
@@ -477,7 +482,7 @@ class OneRun {
                 }
             }
 
-            if (!loadRays) {
+
                 System.out.println("Compute Rays...")
                 // Configure noisemap with specified receivers
                 //-----------------------------------------------------------------
@@ -486,12 +491,12 @@ class OneRun {
 
                 // on a pas vraiment besoin de energeticsum, enfin on en discutera
                 double[] energeticSum = new double[8]
-                int threadCount = 5
+                int threadCount = 1
                 // ici on configure les data pour tirer les rayons
                 //PropagationProcessData rayData = new PropagationProcessData(new ArrayList<Coordinate>(), manager, sourcesIndex, sourceGeometries, wj_sources, db_field_freq, reflexion_order, diffraction_order, max_src_dist, max_ref_dist, min_ref_dist, wall_alpha, favrose2, forget_source, 0, null, geoWithSoilTypeList, true)
                 PropagationProcessData rayData = new PropagationProcessData(manager)
                 // phase d'init
-                rayData.makeRelativeZToAbsoluteOnlySources()
+
                 rayData.setComputeHorizontalDiffraction(true)
                 rayData.setComputeVerticalDiffraction(true)
                 rayData.reflexionOrder = reflexion_order
@@ -503,11 +508,13 @@ class OneRun {
                     rayData.addReceiver(new Coordinate(receiver.x, receiver.y, receiver.z + manager.getHeightAtPosition(receiver)))
                 }
                 rayData.setSources(sourcesIndex, sourceGeometries)
+                rayData.makeRelativeZToAbsoluteOnlySources()
                 // et la pour chacun des receptuers, on va chercher les rayons vers les sources
                 //
                 //for (int pk = 0; pk < receivers.size(); pk++) {
                 //System.out.println(100 * pk / receivers.size() + " %")
                 PropagationProcessPathData attData = new PropagationProcessPathData()
+                rayData.cellProg = new ProgressLogger().subProcess(receivers.size())
                 ComputeRaysOut propDataOut = new ComputeRaysOut(true, attData)
                // ComputeRays propaProcess = new ComputeRays(rayData, propDataOut)
                 ComputeRays computeRays = new ComputeRays(rayData)
@@ -530,7 +537,7 @@ class OneRun {
                          break
                      }*/
                 //}
-            }
+
 
             // Ici on rentre dans la phase calcul de la matrice de transfer
             System.out.println("Compute Attenuation...")
@@ -558,49 +565,28 @@ class OneRun {
   */
             /*HashMap<Integer, Double> Result_by_receivers = new HashMap<>()
             Iterator it = propaMap.entrySet().iterator()
-            while (it.hasNext()) {
-                Map.Entry pair = (Map.Entry) it.next()
-                int idReceiver = pair.getKey()
+            while (it.hasNext()) {*/
+            def qry = 'INSERT INTO RECEIVER_LVL_DAY_ZONE (IDRECEPTEUR, IDSOURCE,' +
+                    'ATT63, ATT125, ATT250, ATT500, ATT1000,ATT2000, ATT4000, ATT8000) ' +
+                    'VALUES (?,?,?,?,?,?,?,?,?,?);'
 
-                HashMap<Integer, double[]> aGlobal = new HashMap<>()
+            for (int i=0; i < propDataOut.getVerticesSoundLevel().size(); i++){
 
-                aGlobal = propDataOut.verticesSoundLevel
+                int idReceiver = propDataOut.getVerticesSoundLevel().get(i).receiverId
+                int idSource = propDataOut.getVerticesSoundLevel().get(i).sourceId
+                double[] att = propDataOut.getVerticesSoundLevel().get(i).value
+                int idRecv = receiversPk.get(idReceiver).toInteger()
+                int idSrc = sourcesPk.get(idSource).toInteger()
 
-                // ca c'est pour ecrire dans la table postgre
-                // puisque la combinaison sources + transfer matrix
-                // se fait encore en postgis
-                // mais dans le futur pourquoi pas rester en groovy
-                // ca aura plus de sens
-                Iterator it2 = aGlobal.entrySet().iterator()
-                def qry = 'INSERT INTO RECEIVER_LVL_DAY_ZONE (IDRECEPTEUR, IDSOURCE,' +
-                        'ATT63, ATT125, ATT250, ATT500, ATT1000,ATT2000, ATT4000, ATT8000) ' +
-                        'VALUES (?,?,?,?,?,?,?,?,?,?);'
                 sql.withBatch(100, qry) { ps ->
-                    while (it2.hasNext()) {
-                        Map.Entry pair2 = (Map.Entry) it2.next()
-                        double[] att = (double[]) pair2.getValue()
-                        int idRecv = receiversPk.get(idReceiver).toInteger()
-                        int idSrc = sourcesPk.get((Integer) pair2.getKey()).toInteger()
-                        double[] sourceLevel = wj_sources.get((Integer) pair2.getKey())
-                        output.addVerticeSoundLevel(idRecv, (Integer) pair2.getKey(), sourceLevel)
-                        ps.addBatch(idRecv, idSrc,
-                                att[0], att[1], att[2], att[3], att[4], att[5], att[6], att[7])
+                        ps.addBatch(idRecv, idSrc,  att[0], att[1], att[2], att[3], att[4], att[5], att[6], att[7])
 
-                        if (Result_by_receivers.containsKey(idReceiver)) {
-                            Result_by_receivers.replace(idReceiver, wToDba( sourceLevel[0]+ DbaToW(Result_by_receivers.get(idReceiver)) + DbaToW(att[0])))
-                        } else {
-                            Result_by_receivers.put(idReceiver, wToDba( sourceLevel[0]+  DbaToW(att[0])))
-                        }
-
-                        it2.remove() // avoids a ConcurrentModificationException
-                    }
                 }
 
-                it.remove()
-            }*/
+            }
 
 
-            if (printresult) {
+            /*if (printresult) {
                 System.out.println("Impression resultats...")
                 String filename3 = workspace_output + "\\Result.kml"
                 try {
@@ -609,7 +595,7 @@ class OneRun {
                 } catch (IOException e) {
                     e.printStackTrace()
                 }
-            }
+            }*/
 
             // A partir de la jusqua la fin c'est de la jointure de table,
             // pour faire emetteur + matrice de trasnfer + recepteurs
@@ -1658,3 +1644,73 @@ class OneRun {
 
 
 }
+
+/**
+ * @author Nicolas Fortin
+ */
+public class ProgressLogger implements ProgressVisitor {
+    private static final Logger LOGGER = LoggerFactory.getLogger("gui."+org.orbisgis.noisemap.h2.ProgressLogger.class);
+    private int receiverCount = 1;
+    private int processed = 0;
+    private int lastLogProgression = 0;
+
+    @Override
+    public ProgressVisitor subProcess(int i) {
+        receiverCount = i;
+        processed = 0;
+        return this;
+    }
+
+    @Override
+    public void endStep() {
+        synchronized (this) {
+            processed = Math.min(receiverCount, processed + 1);
+            int prog = (int) ((processed / (double) receiverCount) * 100);
+            if (prog != lastLogProgression) {
+                lastLogProgression = prog;
+                LOGGER.info(prog+" %");
+            }
+        }
+    }
+
+    @Override
+    public void setStep(int i) {
+
+    }
+
+    @Override
+    public int getStepCount() {
+        return 0;
+    }
+
+    @Override
+    public void endOfProgress() {
+
+    }
+
+    @Override
+    public double getProgression() {
+        return 0;
+    }
+
+    @Override
+    public boolean isCanceled() {
+        return false;
+    }
+
+    @Override
+    public void cancel() {
+
+    }
+
+    @Override
+    public void addPropertyChangeListener(String s, PropertyChangeListener listener) {
+
+    }
+
+    @Override
+    public void removePropertyChangeListener(PropertyChangeListener listener) {
+
+    }
+}
+
