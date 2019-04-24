@@ -231,7 +231,7 @@ class OneRun {
 
                 sql.execute("CALL File_table('D:\\aumond\\Documents\\Recherche_hors_projet\\2019_03_GCorbeau_Oiseaux\\LastRun\\couches_clean1\\zone.shp','zone_cense_2km')")
                 sql.execute("CALL File_table('D:\\aumond\\Documents\\Recherche_hors_projet\\2019_03_GCorbeau_Oiseaux\\LastRun\\couches_clean1\\batiments2.shp','buildings_zone')")
-                sql.execute("CALL File_table('D:\\aumond\\Documents\\Recherche_hors_projet\\2019_03_GCorbeau_Oiseaux\\LastRun\\couches_clean1\\foresx.shp','receivers2')")
+                sql.execute("CALL File_table('D:\\aumond\\Documents\\Recherche_hors_projet\\2019_03_GCorbeau_Oiseaux\\LastRun\\couches_clean1\\recv.shp','receivers2')")
                 sql.execute("CALL File_table('D:\\aumond\\Documents\\Recherche_hors_projet\\2019_03_GCorbeau_Oiseaux\\LastRun\\couches_clean1\\occsol.shp','land_use_zone_capteur2')")
                 sql.execute("CALL File_table('D:\\aumond\\Documents\\Recherche_hors_projet\\2019_03_GCorbeau_Oiseaux\\LastRun\\couches_clean1\\DEM.shp','DEM_LITE2')")
                 sql.execute("CALL File_table('D:\\aumond\\Documents\\Recherche_hors_projet\\2019_03_GCorbeau_Oiseaux\\LastRun\\couches_clean1\\vide.shp','roads_src_zone')")
@@ -420,7 +420,7 @@ class OneRun {
                 pointNoiseMap.setSoundReflectionOrder(0)
                 pointNoiseMap.setHeightField("HAUTEUR")
                 pointNoiseMap.setDemTable("DEM_LITE2")
-                pointNoiseMap.setMaximumPropagationDistance(100)
+                pointNoiseMap.setMaximumPropagationDistance(5000)
                 pointNoiseMap.setMaximumReflectionDistance(50)
                 pointNoiseMap.setWallAbsorption(0.1)
                 pointNoiseMap.setSoilTableName("LAND_USE_ZONE_CAPTEUR2")
@@ -429,11 +429,9 @@ class OneRun {
 
                 pointNoiseMap.initialize(connection, new EmptyProgressVisitor())
                 pointNoiseMap.setComputeRaysOutFactory(new JDBCComputeRaysOut())
-                pointNoiseMap.setPropagationProcessDataFactory(new JDBCPropagationData())
 
                 List<ComputeRaysOut.verticeSL> allLevels = new ArrayList<>()
                 Set<Long> receivers_ = new HashSet<>()
-                List<PropagationPath> propaMap2 = new ArrayList<>()
                 for (int i = 0; i < pointNoiseMap.getGridDim(); i++) {
                     for (int j = 0; j < pointNoiseMap.getGridDim(); j++) {
                         IComputeRaysOut out = pointNoiseMap.evaluateCell(connection, i, j, new EmptyProgressVisitor(), receivers_)
@@ -610,23 +608,23 @@ class OneRun {
     private static class JDBCComputeRaysOut implements PointNoiseMap.IComputeRaysOutFactory {
         @Override
         IComputeRaysOut create(PropagationProcessData threadData, PropagationProcessPathData pathData) {
-            return new RayOut(false, pathData, (DirectPropagationProcessData)threadData);
+            return new RayOut(false, pathData, (DirectPropagationProcessData)threadData)
         }
     }
 
     private static class RayOut extends ComputeRaysOut {
-        private DirectPropagationProcessData processData;
+        private DirectPropagationProcessData processData
 
         RayOut(boolean keepRays, PropagationProcessPathData pathData, DirectPropagationProcessData processData) {
-            super(keepRays, pathData, processData);
-            this.processData = processData;
+            super(keepRays, pathData, processData)
+            this.processData = processData
         }
 
         @Override
         double[] computeAttenuation(PropagationProcessPathData pathData, long sourceId, double sourceLi, long receiverId, List<PropagationPath> propagationPath) {
             double[] attenuation = super.computeAttenuation(pathData, sourceId, sourceLi, receiverId, propagationPath);
             double[] soundLevel = ComputeRays.wToDba(ComputeRays.multArray(processData.wjSources.get((int)sourceId), ComputeRays.dbaToW(attenuation)));
-            return soundLevel;
+            return soundLevel
         }
     }
 
