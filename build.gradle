@@ -23,8 +23,3 @@ task run_OneRun(type: JavaExec) {
     // args "arg1", "arg2"
 }
 
-task run_MultipleRun(type: JavaExec) {
-    classpath sourceSets.main.runtimeClasspath
-    main = "org.noise_planet.nm_run_multiples_instances.MultipleRun"
-    // args "arg1", "arg2"
-}
