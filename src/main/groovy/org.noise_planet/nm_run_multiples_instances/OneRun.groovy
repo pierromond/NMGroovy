@@ -100,6 +100,7 @@ class OneRun {
         boolean clean = true //true // reset the postgis database
 
         boolean loadRays = false
+        boolean saveRays = true
 
         // Localisation des récepteurs :  (1) : bâtiments, (2) : récepteurs, (3) : bâtiments + récepteurs
 
@@ -127,7 +128,7 @@ class OneRun {
 
         // Noms des tables en entrée et des attributs
 
-        String sources_table_name = "roads_src_zone" // ne pas modifier
+
         String sources_table_name2 = "ROADS_TRAFFIC_ZONE_CAPTEUR_format2"
 
         @SourceURI
@@ -136,21 +137,21 @@ class OneRun {
         String rootPath = scriptLocation.getParent().getParent().getParent().getParent().toString()
         String shpPath = "D:\\aumond\\Documents\\Recherche_hors_projet\\2019_03_GCorbeau_Oiseaux\\LastRun\\couches_clean1\\"
         // Paramètres de propagation
-        int reflexion_order = 0
-        int diffraction_order = 0
-        double max_src_dist = 500
-        double max_ref_dist = 500
-        double min_ref_dist = 1.0
+        int reflexion_order = 1
+        double max_src_dist = 250
+        double max_ref_dist = 100
         double wall_alpha = 0.1 // todo pour le moment cette valeur ne peut pas être changé
-        double forget_source = 0.1 // todo pour le moment cette valeur est inutile
+        int n_thread = 10
+
         boolean compute_vertical_diffraction = true
+        boolean compute_horizontal_diffraction = true
 
         // rose of favourable conditions
-        double[] favrose = [0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25]
+        double[] favrose = [0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00]
         double[] favrose_6_18 = [0.41, 0.39, 0.38, 0.37, 0.36, 0.35, 0.34, 0.34, 0.34, 0.38, 0.44, 0.47, 0.48, 0.49, 0.49, 0.47, 0.45, 0.43]
         double[] favrose_18_22 = [0.53, 0.45, 0.41, 0.39, 0.37, 0.36, 0.36, 0.38, 0.41, 0.53, 0.62, 0.65, 0.67, 0.67, 0.68, 0.69, 0.68, 0.64]
         double[] favrose_22_6 = [0.64, 0.57, 0.51, 0.48, 0.46, 0.43, 0.41, 0.38, 0.36, 0.38, 0.44, 0.49, 0.52, 0.55, 0.58, 0.61, 0.64, 0.67]
-        double[] favrose2 = [0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25]
+
 
 /**
  ///////////////////////////////////////////
@@ -159,8 +160,7 @@ class OneRun {
 
  */
 
-// Ouverture de la base de donnees PostGreSQL qui recueillera les infos
-        ArrayList<String> urls = new ArrayList<>()
+        // Ouverture de la base de donnees PostGreSQL qui recueillera les infos
         ArrayList<Connection> connections = new ArrayList<>()
 
         // Connexion à la base
@@ -197,23 +197,15 @@ class OneRun {
 
         try {
             System.out.println("Init")
-            CSVDriverFunction csv = new CSVDriverFunction()
 
-            CSVDriverFunction exp = new CSVDriverFunction()
-            //////////////////////
-            // Import file text
-            //////////////////////
-
-            ArrayList<Integer> Simu = new ArrayList<Integer>()
-            ArrayList<Double> CalcTime = new ArrayList<Double>()
 
             //////////////////////
             // Ici on debute les calculs
             //////////////////////
 
-            // Écriture d'un fichier avec le temps de calcul
-            PrintWriter CalcTime_record = new PrintWriter(new File(workspace_output + "/data/ComputationTime.txt"))
-            StringBuilder sb2 = new StringBuilder()
+
+            String sources_table_name = "roads_src_zone" // ne pas modifier
+            String receivers_table_name = "RECEIVERS2" // ne pas modifier
 
             // If clean = true, recompute input tables
             if (clean) {
@@ -229,13 +221,16 @@ class OneRun {
                 sql.execute('drop table roads_src_zone if exists ')
                 sql.execute('drop table ROADS_TRAFFIC_ZONE_CAPTEUR_format2 if exists ')
 
-                sql.execute([f:shpPath+"zone.shp"], "CALL File_table(:f,'zone_cense_2km')")
-                sql.execute([f:shpPath+"batiments.shp"],"CALL File_table(:f,'buildings_zone')")
-                sql.execute([f:shpPath+"recv.shp"],"CALL File_table(:f,'receivers2')")
-                sql.execute([f:shpPath+"occsol.shp"],"CALL File_table(:f,'land_use_zone_capteur2')")
-                sql.execute([f:shpPath+"mnt2.shp"],"CALL File_table(:f,'DEM_LITE2')")
-                sql.execute([f:shpPath+"vide.shp"],"CALL File_table(:f,'roads_src_zone')")
-                sql.execute([f:shpPath+"route_adapt2.shp"],"CALL File_table(:f,'ROADS_TRAFFIC_ZONE_CAPTEUR_format2')")
+                sql.execute([f:shpPath+"zone.shp"], "CALL SHPREAD(:f,'zone_cense_2km')")
+                sql.execute([f:shpPath+"batiments.shp"],"CALL SHPREAD(:f,'buildings_zone')")
+                sql.execute([f:shpPath+"recv3.shp"],"CALL SHPREAD(:f,'"+receivers_table_name+"')")
+                sql.execute([f:shpPath+"occsol.shp"],"CALL SHPREAD(:f,'land_use_zone_capteur2')")
+                sql.execute([f:shpPath+"mnt2.shp"],"CALL SHPREAD(:f,'DEM_LITE2')")
+                sql.execute([f:shpPath+"vide.shp"],"CALL SHPREAD(:f,'"+sources_table_name+"')")
+                sql.execute([f:shpPath+"route_adapt2.shp"],"CALL SHPREAD(:f,'ROADS_TRAFFIC_ZONE_CAPTEUR_format2')")
+
+                //sql.execute("delete from receivers2 where pk2 <>3")
+                sql.execute("delete from receivers2 where pk2 > 20")
 
                 sql.execute("create spatial index on zone_cense_2km(the_geom)")
                 sql.execute("create spatial index on buildings_zone(the_geom)")
@@ -252,7 +247,7 @@ class OneRun {
                 //sql.execute(zone_sql_select)
                 //sql.execute("alter table zone rename column geom to the_geom;")
                 //sql.execute("alter table zone alter column the_geom type geometry using ST_SetSRID(the_geom, 2154);")
-                //sql.execute("create index zone_the_geom_gist on zone using GIST (the_geom);")
+               // sql.execute("create index zone_the_geom_gist on zone using GIST (the_geom);")
                 // Préparation des tables d'entée types batiments, routes, etc., sur la zone (Need postgis extension sfcgal)
                 //sql.execute(new File(rootPath + "/sql/LoadTables2Pgis2.sql").text)
             }
@@ -272,6 +267,8 @@ class OneRun {
 
             // ca c'est la table avec tous les rayons, attention gros espace memoire !
             HashMap<Integer, ComputeRaysOut> propaMap = new HashMap<>()
+            List<ComputeRaysOut.verticeSL> allLevels = new ArrayList<>()
+            List<PropagationPath> propaMap2 = new ArrayList<>()
 
             // ----------------------------------
             // Et la on commence la boucle sur les simus
@@ -288,6 +285,7 @@ class OneRun {
             sql.execute("delete from receiver_lvl_night_zone;")
 
             def timeStart2 = new Date()
+
             if (!H2) {
                 sql.execute("truncate " + sources_table_name + ";")
             } else {
@@ -398,14 +396,13 @@ class OneRun {
                 }
             }
 
-            sql.execute('ALTER TABLE ' + sources_table_name + ' ALTER COLUMN ID SET NOT NULL')
-            sql.execute('ALTER TABLE ' + sources_table_name + ' ADD PRIMARY KEY (ID)')
-            // Ici on importe les sources
-            // -> on est d'accord que ecrire dans
-            // la base de données pour pouvoir lire ça sert pas à grand chose
-            // et ça prend beaucoup de temps de calcul, donc c'est optimisable
-            System.out.println("Load Sources in Pgis...")
+            sql.execute('ALTER TABLE ' + sources_table_name + ' ALTER COLUMN ID SET NOT NULL;')
+            sql.execute('ALTER TABLE ' + sources_table_name + ' ADD PRIMARY KEY (ID);')
 
+            sql.execute("create spatial index on roads_src_zone(the_geom)")
+            //sql.execute("delete from roads_src_zone where id <> 2386")
+
+            //sql.execute('ALTER TABLE ' + receivers_table_name + ' ADD PRIMARY KEY (PK);')
 
             if (!loadRays) {
                 System.out.println("Compute Rays...")
@@ -415,24 +412,20 @@ class OneRun {
                 //-----------------------------------------------------------------
 
                 PointNoiseMap pointNoiseMap = new PointNoiseMap("BUILDINGS_ZONE", "ROADS_SRC_ZONE", "RECEIVERS2")
-                pointNoiseMap.setComputeHorizontalDiffraction(false)
-                pointNoiseMap.setComputeVerticalDiffraction(true)
-                pointNoiseMap.setSoundReflectionOrder(0)
+                pointNoiseMap.setComputeHorizontalDiffraction(compute_horizontal_diffraction)
+                pointNoiseMap.setComputeVerticalDiffraction(compute_vertical_diffraction)
+                pointNoiseMap.setSoundReflectionOrder(reflexion_order)
                 pointNoiseMap.setHeightField("HAUTEUR")
                 pointNoiseMap.setDemTable("DEM_LITE2")
-                pointNoiseMap.setMaximumPropagationDistance(5000)
-                pointNoiseMap.setMaximumReflectionDistance(10)
-                pointNoiseMap.setWallAbsorption(0.1)
+                pointNoiseMap.setMaximumPropagationDistance(max_src_dist)
+                pointNoiseMap.setMaximumReflectionDistance(max_ref_dist)
+                pointNoiseMap.setWallAbsorption(wall_alpha)
                 pointNoiseMap.setSoilTableName("LAND_USE_ZONE_CAPTEUR2")
-                pointNoiseMap.setThreadCount(5)
-
+                pointNoiseMap.setThreadCount(n_thread)
 
                 pointNoiseMap.initialize(connection, new EmptyProgressVisitor())
                 pointNoiseMap.setComputeRaysOutFactory(new JDBCComputeRaysOut())
-                pointNoiseMap.setPropagationProcessDataFactory(new JDBCPropagationData())
 
-                List<ComputeRaysOut.verticeSL> allLevels = new ArrayList<>()
-                List<PropagationPath> propaMap2 = new ArrayList<>()
                 Set<Long> receivers_ = new HashSet<>()
                 for (int i = 0; i < pointNoiseMap.getGridDim(); i++) {
                     for (int j = 0; j < pointNoiseMap.getGridDim(); j++) {
@@ -445,154 +438,48 @@ class OneRun {
                     }
                 }
 
-                allLevels
-
-
-
             }
 
              // Ici on rentre dans la phase calcul de la matrice de transfer
 
             System.out.println("Compute Attenuation...")
 
-            Kryo kryo = new Kryo()
-            MapSerializer serializer = new MapSerializer()
-            kryo.register(HashMap.class, serializer)
-            kryo.register(LinkedHashMap.class, serializer)
-            serializer.setKeyClass(String.class, kryo.getSerializer(String.class))
-            serializer.setKeysCanBeNull(false)
-            serializer.setKeyClass(String.class, kryo.getSerializer(String.class))
+            //Kryo kryo = new Kryo()
+            //MapSerializer serializer = new MapSerializer()
+            //kryo.register(ArrayList.class)
+            //kryo.register(LinkedHashMap.class, serializer)
+            //serializer.setKeyClass(String.class, kryo.getSerializer(String.class))
+            //serializer.setKeysCanBeNull(false)
+            //serializer.setKeyClass(String.class, kryo.getSerializer(String.class))
 
-           String filenamebin = workspace_output + "\\Rays.bin"
+           //String filenamebin = workspace_output + "\\Rays.bin"
 
-            if (saveRays){
+            /*if (saveRays && !loadRays){
                 Output outputBin = new Output(new FileOutputStream(filenamebin))
-                kryo.writeObject(outputBin, out)
+                kryo.writeObject(outputBin, propaMap2)
                 outputBin.close()
             }
-/*
-            if (loadRays){
+
+           if (loadRays){
+                propaMap2 = []
                 Input input = new Input(new FileInputStream(filenamebin))
-                propaMap = kryo.readObject(input, HashMap.class)
+                propaMap2 = kryo.readObject(input, ArrayList.class)
                 input.close()
-            }
+            }*/
 
+            def qry = 'INSERT INTO RECEIVER_LVL_DAY_ZONE (IDRECEPTEUR, IDSOURCE,' +
+                    'ATT63, ATT125, ATT250, ATT500, ATT1000,ATT2000, ATT4000, ATT8000) ' +
+                    'VALUES (?,?,?,?,?,?,?,?,?,?);'
+            sql.withBatch(100, qry) { ps ->
+                for (int i=0;i< allLevels.size() ; i++) {
 
-            Iterator it = propaMap.entrySet().iterator()
-            while (it.hasNext()) {
-                Map.Entry pair = (Map.Entry) it.next()
-                int idReceiver = pair.getKey()
-
-                HashMap<Integer, double[]> aGlobal = new HashMap<>()
-
-                PropagationProcessPathData propData = new PropagationProcessPathData()
-                propData.setTemperature(10)
-                propData.setHumidity(70)
-                propData.setPrime2520(true)
-
-                // et c'est cette ligne le coeur de calcul
-                computeWithMeteo(aGlobal, propData, propaMap.get(idReceiver), favrose_22_6)
-
-                // ca c'est pour ecrire dans la table postgre
-                // puisque la combinaison sources + transfer matrix
-                // se fait encore en postgis
-                // mais dans le futur pourquoi pas rester en groovy
-                // ca aura plus de sens
-                Iterator it2 = aGlobal.entrySet().iterator()
-                def qry = 'INSERT INTO RECEIVER_LVL_DAY_ZONE (IDRECEPTEUR, IDSOURCE,' +
-                        'ATT63, ATT125, ATT250, ATT500, ATT1000,ATT2000, ATT4000, ATT8000) ' +
-                        'VALUES (?,?,?,?,?,?,?,?,?,?);'
-                sql.withBatch(100, qry) { ps ->
-                    while (it2.hasNext()) {
-                        Map.Entry pair2 = (Map.Entry) it2.next()
-                        double[] att = (double[]) pair2.getValue()
-                        int idRecv = receiversPk.get(idReceiver).toInteger()
-                        int idSrc = sourcesPk.get((Integer) pair2.getKey()).toInteger()
-                        output.addVerticeSoundLevel(idRecv, (Integer) pair2.getKey(), (double[]) pair2.getValue())
-                        ps.addBatch(idRecv, idSrc,
-                                att[0], att[1], att[2], att[3], att[4], att[5], att[6], att[7])
-
-
-
-                        it2.remove() // avoids a ConcurrentModificationException
-                    }
+                        ps.addBatch(allLevels.get(i).receiverId, allLevels.get(i).sourceId,
+                                allLevels.get(i).value[0], allLevels.get(i).value[1], allLevels.get(i).value[2],
+                                allLevels.get(i).value[3], allLevels.get(i).value[4], allLevels.get(i).value[5],
+                                allLevels.get(i).value[6], allLevels.get(i).value[7])
                 }
-
-                it.remove()
             }
 
-            // A partir de la jusqua la fin c'est de la jointure de table,
-            // pour faire emetteur + matrice de trasnfer + recepteurs
-            // et de l'ecrtirue des fichiers de sorties
-
-            // todo compute for evening and night
-            sql.execute '''drop table if exists receiver_lvl_evening_zone, receiver_lvl_night_zone;'''
-            sql.execute '''create table receiver_lvl_evening_zone as select * from receiver_lvl_day_zone;'''
-            sql.execute '''create table receiver_lvl_night_zone as select * from receiver_lvl_day_zone;'''
-
-            csv.exportTable(connection, "receiver_lvl_day_zone", new File(workspace_output + "/data/receiver_lvl_day_zone.csv"), new EmptyProgressVisitor())
-            csv.exportTable(connection, "receiver_lvl_evening_zone", new File(workspace_output + "/data/receiver_lvl_evening_zone.csv"), new EmptyProgressVisitor())
-            csv.exportTable(connection, "receiver_lvl_night_zone", new File(workspace_output + "/data/receiver_lvl_night_zone.csv"), new EmptyProgressVisitor())
-
-            sql.execute(new File(rootPath + "/sql/Reception_Primary.sql").text)
-            sql.execute(new File(rootPath + "/sql/Reception.sql").text)
-            switch (batrec) {
-                case 1:
-                    File csvFile = new File(workspace_output + "/data/Simu_" + 0 + "_pop_lvl_n.csv")
-                    exp.exportTable(connection, "pop_lvl_n", csvFile, new EmptyProgressVisitor())
-                    csvFile = new File(workspace_output + "/data/Simu_" + 0 + "_pop_lvl_den.csv")
-                    exp.exportTable(connection, "pop_lvl_den", csvFile, new EmptyProgressVisitor())
-                    break
-                case 2:
-                    File csvFile = new File(workspace_output + "/data/Simu_" + 0 + "_Lden.csv")
-                    exp.exportTable(connection, "Lden", csvFile, new EmptyProgressVisitor())
-                    sql.execute '''drop table if exists receivers_lden_zone;'''
-                    sql.execute '''create table receivers_lden_zone as 
-                                        select cast(s.db as float) as Lden, r.the_geom as the_geom 
-                                        from lvl_receiver_lvl_day_zone as s, receivers as r 
-                                        where s.id = r.id;'''
-                    break
-                case 3:
-                    File csvFile = new File(workspace_output + "/data/Simu_" + 0 + "_pop_lvl_n.csv")
-                    exp.exportTable(connection, "pop_lvl_n", csvFile, new EmptyProgressVisitor())
-                    csvFile = new File(workspace_output + "/data/Simu_" + 0 + "_pop_lvl_den.csv")
-                    exp.exportTable(connection, "pop_lvl_den", csvFile, new EmptyProgressVisitor())
-                    csvFile = new File(workspace_output + "/data/Simu_" + 0 + "_Lden.csv")
-                    exp.exportTable(connection, "Lden", csvFile, new EmptyProgressVisitor())
-                    break
-            }
-
-            def timeStop = new Date()
-            CalcTime[0] = TimeCategory.minus(timeStop, timeStart).toMilliseconds()
-            sb2.append(Simu[0].toString() + "\t")
-            sb2.append(CalcTime[0].toString() + "\n")
-
-            CalcTime_record.write(sb2.toString())
-            CalcTime_record.close() */
-
-            //la on zip les results
-            String zipFileName = "results.zip"
-            String inputDir = workspace_output
-
-            ZipOutputStream output_ = new ZipOutputStream(new FileOutputStream(workspace_output + zipFileName))
-
-            new File(inputDir).eachFile() { file ->
-                if (!file.isFile()) {
-                    return
-                }
-                println file.name.toString()
-                println file.toString()
-
-                output_.putNextEntry(new ZipEntry(file.name.toString())) // Create the name of the entry in the ZIP
-
-                InputStream input = new FileInputStream(file)
-
-                // Stream the document data to the ZIP
-                Files.copy(input, output_)
-                output_.closeEntry() // End of current document in ZIP
-                input.close()
-            }
-            output_.close() // End of all documents - ZIP is complete
 
 
         } finally {
@@ -602,56 +489,27 @@ class OneRun {
         }
     }
 
-    private static class JDBCPropagationData implements PointNoiseMap.PropagationProcessDataFactory {
-        @Override
-        PropagationProcessData create(FastObstructionTest freeFieldFinder) {
-            return new PropagationProcessData(freeFieldFinder)
-        }
-    }
 
     private static class JDBCComputeRaysOut implements PointNoiseMap.IComputeRaysOutFactory {
         @Override
         IComputeRaysOut create(PropagationProcessData threadData, PropagationProcessPathData pathData) {
-            return new RayOut(true, pathData)
+            return new RayOut(true, pathData, threadData)
         }
     }
 
     private static class RayOut extends ComputeRaysOut {
 
-        RayOut(boolean keepRays, PropagationProcessPathData pathData) {
-            super(keepRays, pathData)
+        RayOut(boolean keepRays, PropagationProcessPathData pathData, PropagationProcessData threadData) {
+            super(keepRays, pathData, threadData)
         }
 
         @Override
         double[] computeAttenuation(PropagationProcessPathData pathData, long sourceId, double sourceLi, long receiverId, List<PropagationPath> propagationPath) {
+            pathData.windRose=[0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00]
             double[] attenuation = super.computeAttenuation(pathData, sourceId, sourceLi, receiverId, propagationPath);
             return attenuation
         }
     }
 
-    private static class DirectPropagationProcessData extends PropagationProcessData {
-        private List<double[]> wjSources = new ArrayList<>();
-        private final static String[] powerColumns = ["db_m63", "db_m125","db_m250", "db_m500", "db_m1000", "db_m2000", "db_m4000", "db_m8000"]
 
-        DirectPropagationProcessData(FastObstructionTest freeFieldFinder) {
-            super(freeFieldFinder);
-        }
-
-
-        @Override
-        void addSource(Long pk, Geometry geom, SpatialResultSet rs)  throws SQLException {
-            super.addSource(pk, geom, rs)
-            def sl = new double[powerColumns.length]
-            int i = 0
-            for(String columnName : powerColumns) {
-                sl[i++] = ComputeRays.dbaToW(rs.getDouble(columnName))
-            }
-            wjSources.add(sl)
-        }
-
-        @Override
-        double[] getMaximalSourcePower(int sourceId) {
-            return wjSources.get(sourceId)
-        }
-    }
 }
