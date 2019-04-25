@@ -223,7 +223,7 @@ class OneRun {
 
                 sql.execute([f:shpPath+"zone.shp"], "CALL SHPREAD(:f,'zone_cense_2km')")
                 sql.execute([f:shpPath+"batiments.shp"],"CALL SHPREAD(:f,'buildings_zone')")
-                sql.execute([f:shpPath+"recv3.shp"],"CALL SHPREAD(:f,'"+receivers_table_name+"')")
+                sql.execute([f:shpPath+"foresx.shp"],"CALL SHPREAD(:f,'"+receivers_table_name+"')")
                 sql.execute([f:shpPath+"occsol.shp"],"CALL SHPREAD(:f,'land_use_zone_capteur2')")
                 sql.execute([f:shpPath+"mnt2.shp"],"CALL SHPREAD(:f,'DEM_LITE2')")
                 sql.execute([f:shpPath+"vide.shp"],"CALL SHPREAD(:f,'"+sources_table_name+"')")
