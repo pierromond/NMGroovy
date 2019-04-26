@@ -20,43 +20,18 @@ import com.fasterxml.jackson.databind.ser.std.ArraySerializerBase
 import groovy.sql.Sql
 
 import org.apache.commons.io.FileUtils
-import org.cts.CRSFactory
-import org.cts.crs.CoordinateReferenceSystem
-import org.cts.crs.GeodeticCRS
-import org.cts.registry.EPSGRegistry
-import org.cts.registry.RegistryManager
-import org.h2gis.functions.spatial.crs.EPSGTuple
-import org.h2gis.functions.spatial.crs.ST_Transform
-import org.h2gis.functions.spatial.volume.GeometryExtrude
-import org.h2gis.utilities.JDBCUtilities
-import org.h2gis.utilities.SFSUtilities
-import org.h2gis.utilities.SpatialResultSet
-import org.h2gis.utilities.TableLocation
-import org.locationtech.jts.algorithm.Angle
-import org.locationtech.jts.geom.Coordinate
-import org.locationtech.jts.geom.Envelope
-import org.locationtech.jts.geom.Geometry
-import org.locationtech.jts.geom.GeometryCollection
-import org.locationtech.jts.geom.GeometryFactory
-import org.locationtech.jts.geom.MultiPolygon
-import org.locationtech.jts.geom.Point
-import org.locationtech.jts.geom.Polygon
-import org.locationtech.jts.geom.impl.CoordinateArraySequence
-import org.locationtech.jts.geom.util.GeometryEditor
+import org.h2gis.api.ProgressVisitor
 
-import org.h2gis.functions.io.csv.CSVDriverFunction
 import org.h2gis.utilities.wrapper.ConnectionWrapper
-import org.cts.op.CoordinateOperationFactory
 import org.noise_planet.noisemodelling.propagation.KMLDocument
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 
+import java.beans.PropertyChangeListener
 import java.sql.Connection
 import java.sql.DriverManager
-import java.sql.PreparedStatement
-import java.sql.SQLException
 
-import org.noise_planet.noisemodelling.propagation.ComputeRays
 import org.noise_planet.noisemodelling.propagation.ComputeRaysOut
-import org.noise_planet.noisemodelling.propagation.FastObstructionTest
 import org.noise_planet.noisemodelling.propagation.IComputeRaysOut
 import org.noise_planet.noisemodelling.propagation.PropagationPath
 import org.noise_planet.noisemodelling.propagation.PropagationProcessData
@@ -65,8 +40,6 @@ import org.noise_planet.noisemodelling.propagation.jdbc.PointNoiseMap
 import org.noise_planet.noisemodelling.emission.RSParametersCnossos
 import org.noise_planet.noisemodelling.emission.EvaluateRoadSourceCnossos
 
-import groovy.time.*
-import java.nio.file.Files
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import org.h2gis.api.EmptyProgressVisitor
@@ -425,9 +398,9 @@ class OneRun {
                 pointNoiseMap.setWallAbsorption(wall_alpha)
                 pointNoiseMap.setSoilTableName("LAND_USE_ZONE_CAPTEUR2")
                 pointNoiseMap.setThreadCount(n_thread)
-
+                JDBCComputeRaysOut jdbcComputeRaysOut = new JDBCComputeRaysOut();
                 pointNoiseMap.initialize(connection, new EmptyProgressVisitor())
-                pointNoiseMap.setComputeRaysOutFactory(new JDBCComputeRaysOut())
+                pointNoiseMap.setComputeRaysOutFactory(jdbcComputeRaysOut)
 
                 Set<Long> receivers_ = new HashSet<>()
                 for (int i = 0; i < pointNoiseMap.getGridDim(); i++) {
@@ -441,6 +414,8 @@ class OneRun {
                     }
                 }
 
+                jdbcComputeRaysOut.closeKML()
+
             }
 
              // Ici on rentre dans la phase calcul de la matrice de transfer
@@ -448,7 +423,7 @@ class OneRun {
             System.out.println("Compute Attenuation...")
 
             String filenameSceneKml = workspace_output + "\\Scene.KML"
-            KMLDocument.exportScene(filenameSceneKml,manager)
+
 
             String filenamebin = workspace_output + "\\Rays.bin"
             DataOutputStream outputBin = new DataOutputStream(new FileOutputStream(filenamebin))
@@ -496,18 +471,45 @@ class OneRun {
         }
     }
 
-
     private static class JDBCComputeRaysOut implements PointNoiseMap.IComputeRaysOutFactory {
+        long exportReceiverRay = 1 // primary key of receiver to export
+        KMLDocument kmlDocument
+        ZipOutputStream compressedDoc
+
+        void closeKML(){
+            if(kmlDocument != null) {
+                kmlDocument.writeFooter()
+                compressedDoc.closeEntry()
+                compressedDoc.close()
+            }
+        }
+
         @Override
         IComputeRaysOut create(PropagationProcessData threadData, PropagationProcessPathData pathData) {
-            return new RayOut(true, pathData, threadData)
+            closeKML()
+            kmlDocument = null
+            if(true || !threadData.receivers.isEmpty()) {
+                compressedDoc = new ZipOutputStream(new FileOutputStream(
+                        String.format("domain_%d.kmz", threadData.cellId)))
+                compressedDoc.putNextEntry(new ZipEntry("doc.kml"))
+                kmlDocument = new KMLDocument(compressedDoc)
+                kmlDocument.writeHeader()
+                kmlDocument.setInputCRS("EPSG:2154")
+                //kmlDocument.writeTopographic(threadData.freeFieldFinder.getTriangles(), threadData.freeFieldFinder.getVertices())
+                kmlDocument.writeBuildings(threadData.freeFieldFinder)
+            }
+
+            return new RayOut(true, pathData, threadData, this)
         }
     }
 
     private static class RayOut extends ComputeRaysOut {
+        JDBCComputeRaysOut jdbccomputeraysout
 
-        RayOut(boolean keepRays, PropagationProcessPathData pathData, PropagationProcessData threadData) {
-            super(keepRays, pathData, threadData)
+        RayOut(boolean keepRays, PropagationProcessPathData pathData, PropagationProcessData processData, JDBCComputeRaysOut jdbccomputeraysout) {
+            super(keepRays, pathData, processData)
+            this.jdbccomputeraysout = jdbccomputeraysout
+
         }
 
         @Override
@@ -516,7 +518,86 @@ class OneRun {
             double[] attenuation = super.computeAttenuation(pathData, sourceId, sourceLi, receiverId, propagationPath);
             return attenuation
         }
+
+        @Override
+        void finalizeReceiver(long receiverId) {
+            super.finalizeReceiver(receiverId);
+            if(jdbccomputeraysout.kmlDocument != null && receiverId < inputData.receiversPk.size()) {
+                receiverId = inputData.receiversPk.get((int)receiverId);
+                if(receiverId == jdbccomputeraysout.exportReceiverRay) {
+                    // Export rays
+                    jdbccomputeraysout.kmlDocument.writeRays(propagationPaths)
+                }
+            }
+            propagationPaths.clear()
+        }
     }
 
+}
 
+
+public class ProgressLogger implements ProgressVisitor {
+    private static final Logger LOGGER = LoggerFactory.getLogger("gui."+ProgressLogger.class);
+    private int receiverCount = 1;
+    private int processed = 0;
+    private int lastLogProgression = 0;
+
+    @Override
+    public ProgressVisitor subProcess(int i) {
+        receiverCount = i;
+        processed = 0;
+        return this;
+    }
+
+    @Override
+    public void endStep() {
+        synchronized (this) {
+            processed = Math.min(receiverCount, processed + 1);
+            int prog = (int) ((processed / (double) receiverCount) * 100);
+            if (prog != lastLogProgression) {
+                lastLogProgression = prog;
+                LOGGER.info(prog+" %");
+            }
+        }
+    }
+
+    @Override
+    public void setStep(int i) {
+
+    }
+
+    @Override
+    public int getStepCount() {
+        return 0;
+    }
+
+    @Override
+    public void endOfProgress() {
+
+    }
+
+    @Override
+    public double getProgression() {
+        return 0;
+    }
+
+    @Override
+    public boolean isCanceled() {
+        return false;
+    }
+
+    @Override
+    public void cancel() {
+
+    }
+
+    @Override
+    public void addPropertyChangeListener(String s, PropertyChangeListener listener) {
+
+    }
+
+    @Override
+    public void removePropertyChangeListener(PropertyChangeListener listener) {
+
+    }
 }
