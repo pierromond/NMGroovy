@@ -3,7 +3,9 @@ package org.noise_planet.nm_run_multiples_instances
 import com.esotericsoftware.kryo.Kryo
 import com.esotericsoftware.kryo.io.Input
 import com.esotericsoftware.kryo.io.Output
+import com.esotericsoftware.kryo.serializers.DefaultArraySerializers
 import com.esotericsoftware.kryo.serializers.MapSerializer
+import com.fasterxml.jackson.databind.ser.std.ArraySerializerBase
 
 /** author : Aumond Pierre
 
@@ -138,7 +140,7 @@ class OneRun {
         String shpPath = "D:\\aumond\\Documents\\Recherche_hors_projet\\2019_03_GCorbeau_Oiseaux\\LastRun\\couches_clean1\\"
         // Paramètres de propagation
         int reflexion_order = 1
-        double max_src_dist = 250
+        double max_src_dist = 5000
         double max_ref_dist = 100
         double wall_alpha = 0.1 // todo pour le moment cette valeur ne peut pas être changé
         int n_thread = 10
@@ -223,14 +225,14 @@ class OneRun {
 
                 sql.execute([f:shpPath+"zone.shp"], "CALL SHPREAD(:f,'zone_cense_2km')")
                 sql.execute([f:shpPath+"batiments.shp"],"CALL SHPREAD(:f,'buildings_zone')")
-                sql.execute([f:shpPath+"foresx.shp"],"CALL SHPREAD(:f,'"+receivers_table_name+"')")
+                sql.execute([f:shpPath+"recv.shp"],"CALL SHPREAD(:f,'"+receivers_table_name+"')")
                 sql.execute([f:shpPath+"occsol.shp"],"CALL SHPREAD(:f,'land_use_zone_capteur2')")
                 sql.execute([f:shpPath+"mnt2.shp"],"CALL SHPREAD(:f,'DEM_LITE2')")
                 sql.execute([f:shpPath+"vide.shp"],"CALL SHPREAD(:f,'"+sources_table_name+"')")
                 sql.execute([f:shpPath+"route_adapt2.shp"],"CALL SHPREAD(:f,'ROADS_TRAFFIC_ZONE_CAPTEUR_format2')")
 
                 //sql.execute("delete from receivers2 where pk2 <>3")
-                sql.execute("delete from receivers2 where pk2 > 20")
+                //sql.execute("delete from receivers2 where pk2 > 20")
 
                 sql.execute("create spatial index on zone_cense_2km(the_geom)")
                 sql.execute("create spatial index on buildings_zone(the_geom)")
@@ -444,17 +446,30 @@ class OneRun {
 
             System.out.println("Compute Attenuation...")
 
-            //Kryo kryo = new Kryo()
-            //MapSerializer serializer = new MapSerializer()
-            //kryo.register(ArrayList.class)
+            Kryo kryo = new Kryo()
+
+            kryo.register(propaMap2.getClass())
+            String filenamebin = workspace_output + "\\Rays.bin"
+            Output outputBin = new Output(new FileOutputStream(filenamebin))
+            //kryo.writeObject(outputBin, propaMap2)
+            //propaMap2 = []
+            //Input input = new Input(new FileInputStream(filenamebin))
+            //propaMap2 = kryo.readObject(input, ArrayList.class)
+
+            kryo.writeClassAndObject(outputBin, propaMap2)
+            propaMap2 = []
+            Input input = new Input(new FileInputStream(filenamebin))
+            propaMap2 = (List<PropagationPath>)(kryo.readClassAndObject(input))
+
+            input.close()
             //kryo.register(LinkedHashMap.class, serializer)
             //serializer.setKeyClass(String.class, kryo.getSerializer(String.class))
             //serializer.setKeysCanBeNull(false)
             //serializer.setKeyClass(String.class, kryo.getSerializer(String.class))
 
-           //String filenamebin = workspace_output + "\\Rays.bin"
 
-            /*if (saveRays && !loadRays){
+/*
+            if (saveRays && !loadRays){
                 Output outputBin = new Output(new FileOutputStream(filenamebin))
                 kryo.writeObject(outputBin, propaMap2)
                 outputBin.close()
