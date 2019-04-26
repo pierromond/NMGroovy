@@ -47,6 +47,7 @@ import org.locationtech.jts.geom.util.GeometryEditor
 import org.h2gis.functions.io.csv.CSVDriverFunction
 import org.h2gis.utilities.wrapper.ConnectionWrapper
 import org.cts.op.CoordinateOperationFactory
+import org.noise_planet.noisemodelling.propagation.KMLDocument
 
 import java.sql.Connection
 import java.sql.DriverManager
@@ -270,7 +271,7 @@ class OneRun {
             // ca c'est la table avec tous les rayons, attention gros espace memoire !
             HashMap<Integer, ComputeRaysOut> propaMap = new HashMap<>()
             List<ComputeRaysOut.verticeSL> allLevels = new ArrayList<>()
-            List<PropagationPath> propaMap2 = new ArrayList<>()
+            ArrayList<PropagationPath> propaMap2 = new ArrayList<>()
 
             // ----------------------------------
             // Et la on commence la boucle sur les simus
@@ -446,26 +447,17 @@ class OneRun {
 
             System.out.println("Compute Attenuation...")
 
-            Kryo kryo = new Kryo()
+            String filenameSceneKml = workspace_output + "\\Scene.KML"
+            KMLDocument.exportScene(filenameSceneKml,manager)
 
-            kryo.register(propaMap2.getClass())
             String filenamebin = workspace_output + "\\Rays.bin"
-            Output outputBin = new Output(new FileOutputStream(filenamebin))
-            //kryo.writeObject(outputBin, propaMap2)
-            //propaMap2 = []
-            //Input input = new Input(new FileInputStream(filenamebin))
-            //propaMap2 = kryo.readObject(input, ArrayList.class)
+            DataOutputStream outputBin = new DataOutputStream(new FileOutputStream(filenamebin))
+            PropagationPath.writePropagationPathListStream(outputBin,propaMap2)
 
-            kryo.writeClassAndObject(outputBin, propaMap2)
             propaMap2 = []
-            Input input = new Input(new FileInputStream(filenamebin))
-            propaMap2 = (List<PropagationPath>)(kryo.readClassAndObject(input))
+            DataInputStream input = new DataInputStream(new FileInputStream(filenamebin))
+            PropagationPath.readPropagationPathListStream(input,propaMap2)
 
-            input.close()
-            //kryo.register(LinkedHashMap.class, serializer)
-            //serializer.setKeyClass(String.class, kryo.getSerializer(String.class))
-            //serializer.setKeysCanBeNull(false)
-            //serializer.setKeyClass(String.class, kryo.getSerializer(String.class))
 
 
 /*
