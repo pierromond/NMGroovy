@@ -199,7 +199,7 @@ class OneRun {
 
                 sql.execute([f:shpPath+"zone.shp"], "CALL SHPREAD(:f,'zone_cense_2km')")
                 sql.execute([f:shpPath+"batiments.shp"],"CALL SHPREAD(:f,'buildings_zone')")
-                sql.execute([f:shpPath+"recv.shp"],"CALL SHPREAD(:f,'"+receivers_table_name+"')")
+                sql.execute([f:shpPath+"recv3.shp"],"CALL SHPREAD(:f,'"+receivers_table_name+"')")
                 sql.execute([f:shpPath+"occsol.shp"],"CALL SHPREAD(:f,'land_use_zone_capteur2')")
                 sql.execute([f:shpPath+"mnt2.shp"],"CALL SHPREAD(:f,'DEM_LITE2')")
                 sql.execute([f:shpPath+"vide.shp"],"CALL SHPREAD(:f,'"+sources_table_name+"')")
@@ -434,21 +434,6 @@ class OneRun {
             PropagationPath.readPropagationPathListStream(input,propaMap2)
 
 
-
-/*
-            if (saveRays && !loadRays){
-                Output outputBin = new Output(new FileOutputStream(filenamebin))
-                kryo.writeObject(outputBin, propaMap2)
-                outputBin.close()
-            }
-
-           if (loadRays){
-                propaMap2 = []
-                Input input = new Input(new FileInputStream(filenamebin))
-                propaMap2 = kryo.readObject(input, ArrayList.class)
-                input.close()
-            }*/
-
             def qry = 'INSERT INTO RECEIVER_LVL_DAY_ZONE (IDRECEPTEUR, IDSOURCE,' +
                     'ATT63, ATT125, ATT250, ATT500, ATT1000,ATT2000, ATT4000, ATT8000) ' +
                     'VALUES (?,?,?,?,?,?,?,?,?,?);'
@@ -521,9 +506,9 @@ class OneRun {
 
         @Override
         void finalizeReceiver(long receiverId) {
-            super.finalizeReceiver(receiverId);
+            super.finalizeReceiver(receiverId)
             if(jdbccomputeraysout.kmlDocument != null && receiverId < inputData.receiversPk.size()) {
-                receiverId = inputData.receiversPk.get((int)receiverId);
+                receiverId = inputData.receiversPk.get((int)receiverId)
                 if(receiverId == jdbccomputeraysout.exportReceiverRay) {
                     // Export rays
                     jdbccomputeraysout.kmlDocument.writeRays(propagationPaths)
