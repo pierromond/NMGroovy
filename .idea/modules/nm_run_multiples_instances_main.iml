@@ -29,7 +29,7 @@
     <orderEntry type="module-library">
       <library>
         <CLASSES>
-          <root url="jar://$MODULE_DIR$/../../libs/commons-collections.jar!/" />
+          <root url="jar://$MODULE_DIR$/../../libs/xml-apis-1.4.01.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES />
@@ -38,7 +38,7 @@
     <orderEntry type="module-library">
       <library>
         <CLASSES>
-          <root url="jar://$MODULE_DIR$/../../libs/commons-lang3.jar!/" />
+          <root url="jar://$MODULE_DIR$/../../libs/commons-io-2.4.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES />
@@ -47,7 +47,7 @@
     <orderEntry type="module-library">
       <library>
         <CLASSES>
-          <root url="jar://$MODULE_DIR$/../../libs/dbjobs.jar!/" />
+          <root url="jar://$MODULE_DIR$/../../libs/component.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES />
@@ -56,7 +56,16 @@
     <orderEntry type="module-library">
       <library>
         <CLASSES>
-          <root url="jar://$MODULE_DIR$/../../libs/h2gis-utilities-1.5.0-SNAPSHOT.jar!/" />
+          <root url="jar://$MODULE_DIR$/../../libs/commons.jar!/" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES />
+      </library>
+    </orderEntry>
+    <orderEntry type="module-library">
+      <library>
+        <CLASSES>
+          <root url="jar://$MODULE_DIR$/../../libs/orbisgis-omanager.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES />
@@ -74,7 +83,7 @@
     <orderEntry type="module-library">
       <library>
         <CLASSES>
-          <root url="jar://$MODULE_DIR$/../../libs/xml-apis-1.4.01.jar!/" />
+          <root url="jar://$MODULE_DIR$/../../libs/h2gis-utilities-1.5.0-SNAPSHOT.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES />
@@ -83,16 +92,7 @@
     <orderEntry type="module-library">
       <library>
         <CLASSES>
-          <root url="jar://$MODULE_DIR$/../../libs/workspace-gui.jar!/" />
-        </CLASSES>
-        <JAVADOC />
-        <SOURCES />
-      </library>
-    </orderEntry>
-    <orderEntry type="module-library">
-      <library>
-        <CLASSES>
-          <root url="jar://$MODULE_DIR$/../../libs/wms-client.jar!/" />
+          <root url="jar://$MODULE_DIR$/../../libs/commons-collections.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES />
@@ -146,7 +146,7 @@
     <orderEntry type="module-library">
       <library>
         <CLASSES>
-          <root url="jar://$MODULE_DIR$/../../libs/table-editor-api.jar!/" />
+          <root url="jar://$MODULE_DIR$/../../libs/wms-client.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES />
@@ -155,16 +155,7 @@
     <orderEntry type="module-library">
       <library>
         <CLASSES>
-          <root url="jar://$MODULE_DIR$/../../libs/svg-salamander.jar!/" />
-        </CLASSES>
-        <JAVADOC />
-        <SOURCES />
-      </library>
-    </orderEntry>
-    <orderEntry type="module-library">
-      <library>
-        <CLASSES>
-          <root url="jar://$MODULE_DIR$/../../libs/sqlconsole.jar!/" />
+          <root url="jar://$MODULE_DIR$/../../libs/dbjobs.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES />
@@ -174,6 +165,15 @@
       <library>
         <CLASSES>
           <root url="jar://$MODULE_DIR$/../../libs/sqlconsole-parser.jar!/" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES />
+      </library>
+    </orderEntry>
+    <orderEntry type="module-library">
+      <library>
+        <CLASSES>
+          <root url="jar://$MODULE_DIR$/../../libs/sqlconsole.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES />
@@ -290,7 +290,7 @@
     <orderEntry type="module-library">
       <library>
         <CLASSES>
-          <root url="jar://$MODULE_DIR$/../../libs/org.osgi.service.obr.jar!/" />
+          <root url="jar://$MODULE_DIR$/../../libs/workspace-gui.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES />
@@ -299,7 +299,7 @@
     <orderEntry type="module-library">
       <library>
         <CLASSES>
-          <root url="jar://$MODULE_DIR$/../../libs/org.osgi.enterprise.jar!/" />
+          <root url="jar://$MODULE_DIR$/../../libs/org.apache.servicemix.bundles.xerces.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES />
@@ -317,7 +317,7 @@
     <orderEntry type="module-library">
       <library>
         <CLASSES>
-          <root url="jar://$MODULE_DIR$/../../libs/org.apache.servicemix.bundles.xerces.jar!/" />
+          <root url="jar://$MODULE_DIR$/../../libs/svg-salamander.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES />
@@ -407,7 +407,16 @@
     <orderEntry type="module-library">
       <library>
         <CLASSES>
-          <root url="jar://$MODULE_DIR$/../../libs/ogc-custom-model.jar!/" />
+          <root url="jar://$MODULE_DIR$/../../libs/orbisgis-omanager-plugin.jar!/" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES />
+      </library>
+    </orderEntry>
+    <orderEntry type="module-library">
+      <library>
+        <CLASSES>
+          <root url="jar://$MODULE_DIR$/../../libs/itext-osgi.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES />
@@ -425,16 +434,7 @@
     <orderEntry type="module-library">
       <library>
         <CLASSES>
-          <root url="jar://$MODULE_DIR$/../../libs/orbisgis-omanager-plugin.jar!/" />
-        </CLASSES>
-        <JAVADOC />
-        <SOURCES />
-      </library>
-    </orderEntry>
-    <orderEntry type="module-library">
-      <library>
-        <CLASSES>
-          <root url="jar://$MODULE_DIR$/../../libs/orbisgis-omanager.jar!/" />
+          <root url="jar://$MODULE_DIR$/../../libs/ogc-custom-model.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES />
@@ -578,16 +578,7 @@
     <orderEntry type="module-library">
       <library>
         <CLASSES>
-          <root url="jar://$MODULE_DIR$/../../libs/log-API.jar!/" />
-        </CLASSES>
-        <JAVADOC />
-        <SOURCES />
-      </library>
-    </orderEntry>
-    <orderEntry type="module-library">
-      <library>
-        <CLASSES>
-          <root url="jar://$MODULE_DIR$/../../libs/legend.jar!/" />
+          <root url="jar://$MODULE_DIR$/../../libs/jts-io-osgi.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES />
@@ -605,7 +596,16 @@
     <orderEntry type="module-library">
       <library>
         <CLASSES>
-          <root url="jar://$MODULE_DIR$/../../libs/jts-io-osgi.jar!/" />
+          <root url="jar://$MODULE_DIR$/../../libs/org.osgi.enterprise.jar!/" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES />
+      </library>
+    </orderEntry>
+    <orderEntry type="module-library">
+      <library>
+        <CLASSES>
+          <root url="jar://$MODULE_DIR$/../../libs/legend.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES />
@@ -695,7 +695,7 @@
     <orderEntry type="module-library">
       <library>
         <CLASSES>
-          <root url="jar://$MODULE_DIR$/../../libs/docking-impl.jar!/" />
+          <root url="jar://$MODULE_DIR$/../../libs/commons-collections4.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES />
@@ -713,7 +713,7 @@
     <orderEntry type="module-library">
       <library>
         <CLASSES>
-          <root url="jar://$MODULE_DIR$/../../libs/itext-osgi.jar!/" />
+          <root url="jar://$MODULE_DIR$/../../libs/docking-impl.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES />
@@ -722,7 +722,7 @@
     <orderEntry type="module-library">
       <library>
         <CLASSES>
-          <root url="jar://$MODULE_DIR$/../../libs/commons.jar!/" />
+          <root url="jar://$MODULE_DIR$/../../libs/commons-compress.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES />
@@ -839,15 +839,6 @@
     <orderEntry type="module-library">
       <library>
         <CLASSES>
-          <root url="jar://$MODULE_DIR$/../../libs/editor-jdbc.jar!/" />
-        </CLASSES>
-        <JAVADOC />
-        <SOURCES />
-      </library>
-    </orderEntry>
-    <orderEntry type="module-library">
-      <library>
-        <CLASSES>
           <root url="jar://$MODULE_DIR$/../../libs/framework-5.1.0-SNAPSHOT.jar!/" />
         </CLASSES>
         <JAVADOC />
@@ -857,7 +848,7 @@
     <orderEntry type="module-library">
       <library>
         <CLASSES>
-          <root url="jar://$MODULE_DIR$/../../libs/commons-collections4.jar!/" />
+          <root url="jar://$MODULE_DIR$/../../libs/editor-jdbc.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES />
@@ -866,7 +857,16 @@
     <orderEntry type="module-library">
       <library>
         <CLASSES>
-          <root url="jar://$MODULE_DIR$/../../libs/component.jar!/" />
+          <root url="jar://$MODULE_DIR$/../../libs/table-editor-api.jar!/" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES />
+      </library>
+    </orderEntry>
+    <orderEntry type="module-library">
+      <library>
+        <CLASSES>
+          <root url="jar://$MODULE_DIR$/../../libs/commons-cli.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES />
@@ -920,7 +920,7 @@
     <orderEntry type="module-library">
       <library>
         <CLASSES>
-          <root url="jar://$MODULE_DIR$/../../libs/commons-cli.jar!/" />
+          <root url="jar://$MODULE_DIR$/../../libs/commons-lang3.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES />
@@ -929,7 +929,7 @@
     <orderEntry type="module-library">
       <library>
         <CLASSES>
-          <root url="jar://$MODULE_DIR$/../../libs/commons-compress.jar!/" />
+          <root url="jar://$MODULE_DIR$/../../libs/org.osgi.service.obr.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES />
@@ -938,7 +938,7 @@
     <orderEntry type="module-library">
       <library>
         <CLASSES>
-          <root url="jar://$MODULE_DIR$/../../libs/commons-io-2.4.jar!/" />
+          <root url="jar://$MODULE_DIR$/../../libs/log-API.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES />

@@ -1,11 +1,6 @@
 package org.noise_planet.nm_run_multiples_instances
 
-import com.esotericsoftware.kryo.Kryo
-import com.esotericsoftware.kryo.io.Input
-import com.esotericsoftware.kryo.io.Output
-import com.esotericsoftware.kryo.serializers.DefaultArraySerializers
-import com.esotericsoftware.kryo.serializers.MapSerializer
-import com.fasterxml.jackson.databind.ser.std.ArraySerializerBase
+import groovy.sql.Sql
 
 /** author : Aumond Pierre
 
@@ -17,39 +12,26 @@ import com.fasterxml.jackson.databind.ser.std.ArraySerializerBase
  **/
 
 // Importation des librairies nécessaire au code
-import groovy.sql.Sql
-
-import org.apache.commons.io.FileUtils
-
-import org.h2gis.utilities.wrapper.ConnectionWrapper
-import org.noise_planet.noisemodelling.propagation.KMLDocument
-import java.sql.Connection
-import java.sql.DriverManager
-
-import org.noise_planet.noisemodelling.propagation.ComputeRaysOut
-import org.noise_planet.noisemodelling.propagation.IComputeRaysOut
-import org.noise_planet.noisemodelling.propagation.PropagationPath
-import org.noise_planet.noisemodelling.propagation.PropagationProcessData
-import org.noise_planet.noisemodelling.propagation.PropagationProcessPathData
-import org.noise_planet.noisemodelling.propagation.jdbc.PointNoiseMap
-import org.noise_planet.noisemodelling.emission.RSParametersCnossos
-import org.noise_planet.noisemodelling.emission.EvaluateRoadSourceCnossos
-
-import java.util.zip.ZipEntry
-import java.util.zip.ZipOutputStream
-import org.h2gis.api.EmptyProgressVisitor
-
 import groovy.transform.SourceURI
+import org.apache.commons.io.FileUtils
+import org.h2gis.api.EmptyProgressVisitor
+import org.h2gis.utilities.wrapper.ConnectionWrapper
+import org.noise_planet.noisemodelling.emission.EvaluateRoadSourceCnossos
+import org.noise_planet.noisemodelling.emission.RSParametersCnossos
+import org.noise_planet.noisemodelling.propagation.*
+import org.noise_planet.noisemodelling.propagation.jdbc.PointNoiseMap
+
 import java.nio.file.Path
 import java.nio.file.Paths
+import java.sql.Connection
+import java.sql.DriverManager
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 
-
-
-
-class OneRun {
+class MultipleRun {
     static void main(String[] args) {
-        OneRun oneRun = new OneRun()
-        oneRun.run()
+        MultipleRun multipleRun = new MultipleRun()
+        multipleRun.run()
     }
 
     void run() {
@@ -514,5 +496,3 @@ class OneRun {
     }
 
 }
-
-

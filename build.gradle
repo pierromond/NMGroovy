@@ -23,8 +23,22 @@ task run_OneRun(type: JavaExec) {
     // args "arg1", "arg2"
 }
 
+task run_MultipleRun(type: JavaExec) {
+    classpath sourceSets.main.runtimeClasspath
+    main = "org.noise_planet.nm_run_multiples_instances.OneRun"
+    // args "arg1", "arg2"
+}
+
+
 task run_OnlyEmission(type: JavaExec) {
     classpath sourceSets.main.runtimeClasspath
     main = "org.noise_planet.nm_run_multiples_instances.OnlyEmission"
+    // args "arg1", "arg2"
+}
+
+
+task run_OnlyEmissionOneRun(type: JavaExec) {
+    classpath sourceSets.main.runtimeClasspath
+    main = "org.noise_planet.nm_run_multiples_instances.OnlyEmissionOneRun"
     // args "arg1", "arg2"
 }
